@@ -1,0 +1,29 @@
+You are a quick Reels script fixer. Use ONLY the issues and ML facts below. Suggest small, realistic changes to make the episode more engaging for Indian audiences.
+
+Episode text: {episode_text}
+
+ML Analysis (facts only): {full_ml_json}
+
+From Analysis (explainable issues): {llama_output_json}
+
+Suggest 2–3 fixes. Each:
+- Target one issue (e.g., weak cliffhanger).
+- Give rewritten line(s) or section.
+- Explain why it helps (tie to ML score/issue).
+- Keep tone casual if light topic, serious if heavy.
+- No big story changes — just boost engagement.
+
+Confidence: 60–80% max per suggestion.
+
+Output ONLY JSON:
+{
+  "suggestions": [
+    {
+      "target_issue": "...",
+      "original_snippet": "...",
+      "improved_snippet": "...",
+      "why_helps": "...",
+      "confidence": 75
+    }
+  ]
+}
