@@ -7,12 +7,15 @@ import {
     Activity,
     X,
     FileJson,
-    FileText,
-    Loader2,
+    User,
+    LogOut,
     Sparkles,
-    User
+    FileText,
+    Loader2
 } from 'lucide-react';
-import { listProjects, type ProjectResponse } from '../services/api';
+import { listProjects, type ProjectResponse, type GeneratedSeries, type SeriesAnalysis } from '../services/api';
+import { useAuth } from '../contexts/AuthContext';
+import toast from 'react-hot-toast';
 
 // Mock Data with varying content to demonstrate Masonry layout
 interface Project {
@@ -24,6 +27,8 @@ interface Project {
     lastEdited: string;
     thumbnailColor: string;
     pattern: string;
+    generated_series?: GeneratedSeries;
+    analysis?: SeriesAnalysis;
 }
 
 const COLORS = ["bg-[#33A1FF]", "bg-[#FF9E9E]", "bg-[#D4FF33]", "bg-[#C7B9FF]", "bg-[#FFB033]"];
@@ -45,12 +50,17 @@ function mapApiToProject(p: ProjectResponse, idx: number): Project {
         lastEdited: p.created_at ? new Date(p.created_at).toLocaleDateString() : "Unknown",
         thumbnailColor: COLORS[idx % COLORS.length],
         pattern: PATTERNS[idx % PATTERNS.length],
+        generated_series: p.generated_series as any,
+        analysis: p.analysis as any,
     };
 }
 
-const EpisenseDashboard = () => {
+const DashboardPage = () => {
     const navigate = useNavigate();
+    const { user, logout } = useAuth();
     const [isLoaded, setIsLoaded] = useState(false);
+
+    useEffect(() => { document.title = 'Creator Studio — VBOX Episense'; }, []);
     const [selectedProject, setSelectedProject] = useState<Project | null>(null);
     const [exportFormat, setExportFormat] = useState('json');
     const [isExporting, setIsExporting] = useState(false);
@@ -64,7 +74,14 @@ const EpisenseDashboard = () => {
                     setProjects(apiProjects.map(mapApiToProject));
                 }
             })
-            .catch(() => {
+            .catch((err: any) => {
+                const status = err?.response?.status;
+                if (status === 401) {
+                    toast.error("Session expired — please login again.");
+                    logout();
+                    return;
+                }
+                toast.error("Could not load projects. Showing demo projects instead.");
                 // Backend unavailable — keep fallback data
             })
             .finally(() => setIsLoaded(true));
@@ -118,9 +135,16 @@ const EpisenseDashboard = () => {
                             <User className="w-6 h-6 text-[#0A192F]" strokeWidth={3} />
                         </div>
                         <div>
-                            <h2 className="text-xl font-black tracking-tight leading-none mb-1">Creator Studio</h2>
-                            <p className="font-bold text-xs text-[#0A192F]/50 uppercase tracking-widest">Welcome back, Alex</p>
+                            <h2 className="text-xl font-black tracking-tight leading-none mb-1">{user ? user : 'Creator Studio'}</h2>
+                            <p className="font-bold text-xs text-[#0A192F]/50 uppercase tracking-widest">Your Workspace</p>
                         </div>
+                        <button
+                            onClick={logout}
+                            className="bg-[#FDFBF7] border-2 border-[#0A192F] rounded-full p-2 hover:bg-[#FF9E9E] transition-colors shadow-[2px_2px_0px_#0A192F] active:shadow-none active:translate-y-[2px] ml-4"
+                            title="Logout"
+                        >
+                            <LogOut className="w-4 h-4 text-[#0A192F]" />
+                        </button>
                     </div>
 
                     <button
@@ -259,7 +283,32 @@ const EpisenseDashboard = () => {
 
                             {/* Action Area */}
                             <button
-                                onClick={() => navigate('/breakdown')}
+                                onClick={() => {
+                                    if (selectedProject) {
+                                        toast.success("Opening workspace...", {
+                                            icon: '🚀',
+                                            duration: 2000,
+                                            style: {
+                                                border: '4px solid #0A192F',
+                                                padding: '16px',
+                                                color: '#0A192F',
+                                                background: '#33A1FF',
+                                                fontWeight: 900,
+                                                textTransform: 'uppercase',
+                                                borderRadius: '999px',
+                                                boxShadow: '4px 4px 0px #0A192F'
+                                            }
+                                        });
+                                        navigate('/breakdown', {
+                                            state: {
+                                                series: selectedProject.generated_series,
+                                                analysis: selectedProject.analysis
+                                            }
+                                        });
+                                    } else {
+                                        navigate('/breakdown');
+                                    }
+                                }}
                                 disabled={isExporting}
                                 className="w-full bg-[#0A192F] text-white border-4 border-[#0A192F] px-6 py-4 rounded-full font-black text-lg uppercase tracking-wide shadow-[4px_4px_0px_#33A1FF] hover:shadow-[6px_6px_0px_#33A1FF] hover:-translate-y-1 active:translate-y-[2px] active:shadow-none transition-all flex items-center justify-center gap-3 disabled:pointer-events-none disabled:opacity-90"
                             >
@@ -275,28 +324,8 @@ const EpisenseDashboard = () => {
                 )}
             </div>
 
-            {/* Embedded CSS for masonry gap fix and neo-pop animations */}
-            <style dangerouslySetInnerHTML={{
-                __html: `
-        @keyframes modalIn {
-          0% { opacity: 0; transform: scale(0.9) translateY(40px) rotate(-2deg); }
-          100% { opacity: 1; transform: scale(1) translateY(0) rotate(0deg); }
-        }
-        @keyframes popIn {
-          0% { transform: scale(0.8); opacity: 0; }
-          60% { transform: scale(1.05); opacity: 1; }
-          100% { transform: scale(1); opacity: 1; }
-        }
-        
-        .animate-modal-in {
-          animation: modalIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
-        }
-        .animate-pop-in {
-          animation: popIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
-        }
-      `}} />
         </div>
     );
 };
 
-export default EpisenseDashboard;
+export default DashboardPage;

@@ -1,11 +1,12 @@
 """
 Project routes — MongoDB CRUD for saved projects.
 """
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from bson import ObjectId
 from datetime import datetime, timezone
 from app.database import get_database
 from app.models.schemas import ProjectCreate, ProjectResponse
+from app.security import get_current_user_id
 
 router = APIRouter(prefix="/api/v1/projects", tags=["Projects"])
 
@@ -27,10 +28,10 @@ def _project_doc_to_response(doc: dict) -> dict:
 
 
 @router.get("", response_model=list[ProjectResponse])
-async def list_projects():
-    """List all saved projects, most recent first."""
+async def list_projects(user_id: str = Depends(get_current_user_id)):
+    """List saved projects for the current user, most recent first."""
     db = get_database()
-    cursor = db["projects"].find().sort("created_at", -1)
+    cursor = db["projects"].find({"owner_user_id": user_id}).sort("created_at", -1)
     projects = []
     async for doc in cursor:
         projects.append(_project_doc_to_response(doc))
@@ -38,11 +39,11 @@ async def list_projects():
 
 
 @router.get("/{project_id}", response_model=ProjectResponse)
-async def get_project(project_id: str):
-    """Get a single project by ID."""
+async def get_project(project_id: str, user_id: str = Depends(get_current_user_id)):
+    """Get a single project by ID (must belong to current user)."""
     db = get_database()
     try:
-        doc = await db["projects"].find_one({"_id": ObjectId(project_id)})
+        doc = await db["projects"].find_one({"_id": ObjectId(project_id), "owner_user_id": user_id})
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid project ID format")
     if not doc:
@@ -51,12 +52,13 @@ async def get_project(project_id: str):
 
 
 @router.post("", response_model=ProjectResponse, status_code=201)
-async def create_project(project: ProjectCreate):
-    """Create and save a new project to MongoDB."""
+async def create_project(project: ProjectCreate, user_id: str = Depends(get_current_user_id)):
+    """Create and save a new project to MongoDB for the current user."""
     db = get_database()
     doc = project.model_dump()
     doc["created_at"] = datetime.now(timezone.utc).isoformat()
     doc["status"] = "generated"
+    doc["owner_user_id"] = user_id
 
     # Compute derived fields
     if project.generated_series and project.generated_series.episodes:
@@ -70,11 +72,11 @@ async def create_project(project: ProjectCreate):
 
 
 @router.delete("/{project_id}", status_code=204)
-async def delete_project(project_id: str):
-    """Delete a project by ID."""
+async def delete_project(project_id: str, user_id: str = Depends(get_current_user_id)):
+    """Delete a project by ID (must belong to current user)."""
     db = get_database()
     try:
-        result = await db["projects"].delete_one({"_id": ObjectId(project_id)})
+        result = await db["projects"].delete_one({"_id": ObjectId(project_id), "owner_user_id": user_id})
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid project ID format")
     if result.deleted_count == 0:

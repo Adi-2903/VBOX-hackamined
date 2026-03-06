@@ -9,19 +9,22 @@ import {
     Eye,
     Wand2
 } from 'lucide-react';
-import type { SeriesAnalysis } from '../services/api';
+import type { SeriesAnalysis, GeneratedSeries } from '../services/api';
 
-const EpisenseAnalytics = () => {
+const AnalyticsDashboardPage = () => {
     const navigate = useNavigate();
     const location = useLocation();
     const [isLoaded, setIsLoaded] = useState(false);
+
+    useEffect(() => { document.title = 'Series Analytics — VBOX Episense'; }, []);
     const [activeEpisodeHover, setActiveEpisodeHover] = useState<number | null>(null);
 
     useEffect(() => {
         setIsLoaded(true);
     }, []);
 
-    const routerAnalysis = (location.state as { analysis?: SeriesAnalysis } | null)?.analysis;
+    const routerState = location.state as { analysis?: SeriesAnalysis; series?: GeneratedSeries } | null;
+    const routerAnalysis = routerState?.analysis;
 
     // Map API data to component format, fallback to mock
     const seriesData = useMemo(() => {
@@ -95,14 +98,14 @@ const EpisenseAnalytics = () => {
                 <header className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-6">
                     <div className="flex items-center gap-4">
                         <button
-                            onClick={() => navigate(-1)}
+                            onClick={() => navigate('/breakdown', { state: { analysis: routerAnalysis, series: routerState?.series } })}
                             className="w-12 h-12 bg-white border-4 border-[#0A192F] rounded-full flex items-center justify-center hover:bg-[#FF9E9E] hover:-translate-y-1 transition-all shadow-[4px_4px_0px_#0A192F] active:translate-y-[2px] active:shadow-none flex-shrink-0 group">
                             <ArrowLeft className="w-6 h-6 group-hover:-translate-x-1 transition-transform" />
                         </button>
                         <div>
                             <div className="flex items-center gap-3 mb-1">
                                 <span className="bg-[#D4FF33] border-2 border-[#0A192F] rounded-full px-3 py-0.5 text-[10px] font-black uppercase tracking-widest shadow-[2px_2px_0px_#0A192F]">Intelligence Report</span>
-                                <span className="text-[#0A192F]/50 font-bold text-sm uppercase">VBOX_DeepSea</span>
+                                <span className="text-[#0A192F]/50 font-bold text-sm uppercase">{routerState?.series?.direction || 'Series Analytics'}</span>
                             </div>
                             <h1 className="text-4xl md:text-5xl font-black tracking-tight leading-none">Series Analytics.</h1>
                         </div>
@@ -296,11 +299,18 @@ const EpisenseAnalytics = () => {
 
                                 <h3 className="text-2xl font-black mb-2">High Retention Risk</h3>
                                 <p className="font-medium text-white/70 text-sm mb-6">
-                                    ML Prediction flags a massive viewer drop-off in <strong className="text-[#FF9E9E]">Episode 4 @ 0:60</strong> due to pacing stall.
+                                    {(() => {
+                                        if (!routerAnalysis) return <>ML Prediction flags a massive viewer drop-off in <strong className="text-[#FF9E9E]">Episode 4 @ 0:60</strong> due to pacing stall.</>;
+                                        const weakIdx = routerAnalysis.series_insights.weakest_episode;
+                                        const weakEp = seriesData.episodes.find(e => e.id === weakIdx);
+                                        return weakEp
+                                            ? <>ML Prediction flags retention risk in <strong className="text-[#FF9E9E]">Episode {weakEp.id}: {weakEp.title}{weakEp.dropTime ? ` @ ${weakEp.dropTime}` : ''}</strong> — risk level: {weakEp.riskLevel}.</>
+                                            : <>ML model flagged retention risks across the series.  Run the Suggestion Engine for fixes.</>;
+                                    })()}
                                 </p>
 
                                 <button
-                                    onClick={() => navigate('/suggestions', { state: { analysis: routerAnalysis } })}
+                                    onClick={() => navigate('/suggestions', { state: { analysis: routerAnalysis, series: routerState?.series } })}
                                     className="w-full bg-[#D4FF33] border-2 border-white text-[#0A192F] font-black uppercase text-sm py-3 rounded-xl flex items-center justify-center gap-2 hover:bg-white transition-colors">
                                     <Wand2 className="w-4 h-4" /> Open Suggestion Engine
                                 </button>
@@ -312,23 +322,8 @@ const EpisenseAnalytics = () => {
 
             </div>
 
-            {/* Embedded CSS for custom neo-pop animations */}
-            <style dangerouslySetInnerHTML={{
-                __html: `
-        @keyframes draw {
-          from { stroke-dashoffset: 1000; }
-          to { stroke-dashoffset: 0; }
-        }
-        
-        .animate-draw {
-          stroke-dasharray: 1000;
-          stroke-dashoffset: 1000;
-          animation: draw 2s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
-          animation-delay: 0.8s;
-        }
-      `}} />
         </div>
     );
 };
 
-export default EpisenseAnalytics;
+export default AnalyticsDashboardPage;

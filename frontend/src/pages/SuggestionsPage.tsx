@@ -11,7 +11,9 @@ import {
     SplitSquareHorizontal,
     Wand2
 } from 'lucide-react';
-import type { SeriesAnalysis } from '../services/api';
+import type { SeriesAnalysis, GeneratedSeries } from '../services/api';
+import { createProject } from '../services/api';
+import toast from 'react-hot-toast';
 
 interface Suggestion {
     id: number;
@@ -67,11 +69,14 @@ const ICON_MAP: Record<string, React.ElementType> = {
 };
 const COLOR_MAP = ["bg-[#FF9E9E]", "bg-[#D4FF33]", "bg-[#33A1FF]", "bg-[#C7B9FF]"];
 
-const EpisenseRefine = () => {
+const SuggestionsPage = () => {
     const navigate = useNavigate();
     const location = useLocation();
 
-    const routerAnalysis = (location.state as { analysis?: SeriesAnalysis } | null)?.analysis;
+    useEffect(() => { document.title = 'Suggestions — VBOX Episense'; }, []);
+
+    const routerState = location.state as { analysis?: SeriesAnalysis; series?: GeneratedSeries } | null;
+    const routerAnalysis = routerState?.analysis;
 
     // Build suggestions from API analysis data
     const derivedSuggestions = useMemo<Suggestion[]>(() => {
@@ -153,12 +158,12 @@ const EpisenseRefine = () => {
                 <header className="flex flex-col md:flex-row justify-between items-start md:items-center mb-12 gap-6">
                     <div className="flex items-center gap-4">
                         <button
-                            onClick={() => navigate(-1)}
+                            onClick={() => navigate('/analytics', { state: { analysis: routerAnalysis, series: routerState?.series } })}
                             className="w-12 h-12 bg-white border-4 border-[#0A192F] rounded-full flex items-center justify-center hover:bg-[#D4FF33] transition-all shadow-[4px_4px_0px_#0A192F] active:translate-y-[2px] active:shadow-none flex-shrink-0 group">
                             <ArrowLeft className="w-6 h-6 group-hover:-translate-x-1 transition-transform" />
                         </button>
                         <div>
-                            <div className="text-[10px] font-black uppercase tracking-widest text-[#33A1FF] mb-1">VBOX_DeepSea</div>
+                            <div className="text-[10px] font-black uppercase tracking-widest text-[#33A1FF] mb-1">{routerState?.series?.direction || 'Series Refinement'}</div>
                             <h1 className="text-3xl md:text-5xl font-black tracking-tight leading-none">Refine Series.</h1>
                         </div>
                     </div>
@@ -308,30 +313,64 @@ const EpisenseRefine = () => {
                         );
                     })}
                 </div>
+
+                {/* Finalize CTA */}
+                <div className="mt-12 flex justify-center">
+                    <button
+                        onClick={async () => {
+                            console.log("[SAVE] Button clicked");
+
+                            if (!routerState) {
+                                console.error("[SAVE] No routerState at all");
+                                toast.error("No state available");
+                                return;
+                            }
+
+                            if (!routerState.series) {
+                                console.error("[SAVE] series is missing from routerState", routerState);
+                                toast.error("No series data to save");
+                                return;
+                            }
+
+                            const saveData = {
+                                title: routerState.series.direction || 'Untitled Series',
+                                concept: (routerState as any).concept || routerState.series.hook || 'No concept provided',
+                                genres: [],
+                                generated_series: routerState.series,
+                                analysis: routerAnalysis || null,
+                            };
+
+                            console.log("[SAVE] Preparing to call createProject with:", saveData);
+
+                            try {
+                                console.log("[SAVE] Calling createProject...");
+                                const result = await createProject(saveData);
+                                console.log("[SAVE] Success:", result);
+                                toast.success("Saved to Dashboard");
+                                navigate('/dashboard');
+                            } catch (err: any) {
+                                console.error("[SAVE] Failed:", {
+                                    message: err.message,
+                                    response: err.response?.data,
+                                    status: err.response?.status,
+                                    config: {
+                                        url: err.config?.url,
+                                        method: err.config?.method,
+                                        headers: err.config?.headers,
+                                    }
+                                });
+                                toast.error(err.message || "Save failed — check console");
+                            }
+                        }}
+                        className="bg-[#0A192F] text-[#D4FF33] border-4 border-[#0A192F] rounded-full px-10 py-4 font-black text-lg uppercase tracking-wide shadow-[6px_6px_0px_#D4FF33] hover:shadow-[8px_8px_0px_#D4FF33] hover:-translate-y-1 active:translate-y-[2px] active:shadow-none transition-all flex items-center gap-3"
+                    >
+                        <CheckCircle2 className="w-6 h-6" /> Finalize & Save to Dashboard
+                    </button>
+                </div>
             </div>
 
-            {/* Embedded CSS for custom neo-pop animations */}
-            <style dangerouslySetInnerHTML={{
-                __html: `
-        @keyframes fillWave {
-          0% { transform: scaleX(0); }
-          100% { transform: scaleX(1); }
-        }
-        @keyframes popIn {
-          0% { transform: scale(0.8); opacity: 0; }
-          60% { transform: scale(1.1); opacity: 1; }
-          100% { transform: scale(1); opacity: 1; }
-        }
-        
-        .animate-fill-wave {
-          animation: fillWave 1s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
-        }
-        .animate-pop-in {
-          animation: popIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
-        }
-      `}} />
         </div>
     );
 };
 
-export default EpisenseRefine;
+export default SuggestionsPage;

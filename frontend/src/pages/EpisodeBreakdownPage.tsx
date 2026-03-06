@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
     ArrowLeft,
@@ -7,7 +7,6 @@ import {
     AlertTriangle,
     CheckCircle2,
     Wand2,
-    Download,
     PlaySquare,
     Zap
 } from 'lucide-react';
@@ -32,9 +31,11 @@ const fallbackEpisodeData = [
     },
 ];
 
-const EpisenseDashboard = () => {
+const EpisodeBreakdownPage = () => {
     const navigate = useNavigate();
     const location = useLocation();
+
+    useEffect(() => { document.title = 'Episode Breakdown — VBOX Episense'; }, []);
 
     // Read data from Router state (passed from StoryInputPage)
     const routerState = location.state as {
@@ -73,7 +74,6 @@ const EpisenseDashboard = () => {
 
     const [activeEp, setActiveEp] = useState(episodeData[0]);
     const [fixedEpisodes, setFixedEpisodes] = useState(new Set());
-    const [isExporting, setIsExporting] = useState(false);
 
     const isFixed = fixedEpisodes.has(activeEp.id);
     const currentRisk = isFixed ? null : activeEp.riskZone;
@@ -82,11 +82,6 @@ const EpisenseDashboard = () => {
     };
 
     const currentHookScore = isFixed ? Math.min(100, activeEp.cliffhanger.score + 25) : activeEp.cliffhanger.score;
-
-    const handleExport = () => {
-        setIsExporting(true);
-        setTimeout(() => setIsExporting(false), 2000);
-    };
 
     return (
         <div className="min-h-screen bg-[#FDFBF7] text-[#0A192F] font-sans relative overflow-x-hidden selection:bg-[#33A1FF] selection:text-[#0A192F] pb-20">
@@ -102,24 +97,23 @@ const EpisenseDashboard = () => {
                 <header className="flex flex-col md:flex-row items-start md:items-center justify-between mb-8 gap-4">
                     <div className="flex items-center gap-4">
                         <button
-                            onClick={() => navigate('/')}
+                            onClick={() => navigate('/input')}
                             className="w-12 h-12 bg-white border-4 border-[#0A192F] rounded-full flex items-center justify-center hover:bg-[#D4FF33] active:translate-y-[2px] transition-all shadow-[4px_4px_0px_#0A192F] flex-shrink-0">
                             <ArrowLeft className="w-6 h-6" />
                         </button>
                         <div>
                             <div className="flex items-center gap-2 mb-1">
-                                <span className="bg-[#0A192F] text-[#D4FF33] px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-widest">Project: VBOX_DeepSea</span>
+                                <span className="bg-[#0A192F] text-[#D4FF33] px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-widest">{routerState?.series ? `Project: ${routerState.series.direction}` : 'Episode Breakdown'}</span>
                             </div>
                             <h1 className="text-3xl font-black tracking-tight leading-none">Intelligence Dashboard</h1>
                         </div>
                     </div>
 
                     <button
-                        onClick={handleExport}
-                        disabled={isExporting}
+                        onClick={() => navigate('/analytics', { state: { analysis: routerState?.analysis, series: routerState?.series } })}
                         className="w-full md:w-auto bg-[#33A1FF] border-4 border-[#0A192F] text-[#0A192F] px-6 py-3 rounded-full font-black text-sm uppercase tracking-wide shadow-[4px_4px_0px_#0A192F] hover:shadow-[6px_6px_0px_#0A192F] hover:-translate-y-1 active:translate-y-[2px] active:shadow-none transition-all flex items-center justify-center gap-2"
                     >
-                        {isExporting ? <span className="animate-pulse">Rendering Arc...</span> : <><Download className="w-5 h-5" /> Export to VBOX</>}
+                        <Activity className="w-5 h-5" /> Analyze Series
                     </button>
                 </header>
 
@@ -286,7 +280,7 @@ const EpisenseDashboard = () => {
                                     <button
                                         onClick={() => {
                                             handleApplyFix();
-                                            navigate('/suggestions', { state: { analysis: routerState?.analysis } });
+                                            navigate('/suggestions', { state: { analysis: routerState?.analysis, series: routerState?.series } });
                                         }}
                                         className="w-full bg-[#D4FF33] border-4 border-[#0A192F] text-[#0A192F] px-4 py-4 rounded-2xl font-black uppercase tracking-wide shadow-[4px_4px_0px_#0A192F] hover:-translate-y-1 active:translate-y-[2px] active:shadow-none transition-all flex items-center justify-center gap-2"
                                     >
@@ -306,29 +300,8 @@ const EpisenseDashboard = () => {
                 </div>
             </div>
 
-            {/* Embedded Styles */}
-            <style dangerouslySetInnerHTML={{
-                __html: `
-        /* Hide scrollbar for the minimap */
-        .hide-scrollbar::-webkit-scrollbar {
-          display: none;
-        }
-        .hide-scrollbar {
-          -ms-overflow-style: none;
-          scrollbar-width: none;
-        }
-        
-        @keyframes fadeIn {
-          from { opacity: 0; transform: translateY(10px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-        
-        .animate-fade-in {
-          animation: fadeIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
-        }
-      `}} />
         </div>
     );
 };
 
-export default EpisenseDashboard;
+export default EpisodeBreakdownPage;

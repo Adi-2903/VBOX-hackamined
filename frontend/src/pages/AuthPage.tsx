@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { api } from '../services/api';
 import { useNavigate } from 'react-router-dom';
 import {
     Play,
@@ -9,31 +10,89 @@ import {
     Sparkles,
     Github
 } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
+import toast from 'react-hot-toast';
 
 const AuthPage = () => {
     const navigate = useNavigate();
+    const { login } = useAuth();
     const [isLogin, setIsLogin] = useState(true);
+
+    useEffect(() => { document.title = isLogin ? 'Login — VBOX Episense' : 'Sign Up — VBOX Episense'; }, [isLogin]);
     const [isShaking, setIsShaking] = useState(false);
     const [isSuccess, setIsSuccess] = useState(false);
+    const [authError, setAuthError] = useState<string | null>(null);
+    const [isLoading, setIsLoading] = useState(false);
 
     // Form State
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [name, setName] = useState('');
 
-    const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
+        setAuthError(null);
 
         // Validation check (triggers shake if empty)
         if (!email || !password || (!isLogin && !name)) {
             setIsShaking(true);
-            setTimeout(() => setIsShaking(false), 500); // Remove shake class after animation completes
+            setTimeout(() => setIsShaking(false), 500);
             return;
         }
 
-        // Trigger Success State & Confetti
-        setIsSuccess(true);
-        setTimeout(() => navigate('/dashboard'), 2000);
+        setIsLoading(true);
+
+        try {
+            if (isLogin) {
+                const res = await api.post('/auth/login', { email, password });
+                login(res.data.access_token, res.data.name);
+            } else {
+                const res = await api.post('/auth/signup', { email, password, name });
+                login(res.data.access_token, res.data.name);
+            }
+
+            // Trigger Success State & Confetti
+            setIsSuccess(true);
+            toast.success(isLogin ? "Welcome back!" : "Studio configured!", {
+                icon: '🎬',
+                duration: 3000,
+                style: {
+                    border: '4px solid #0A192F',
+                    padding: '16px',
+                    color: '#0A192F',
+                    background: '#D4FF33',
+                    fontWeight: 900,
+                    textTransform: 'uppercase',
+                    borderRadius: '999px',
+                    boxShadow: '4px 4px 0px #0A192F'
+                }
+            });
+            setTimeout(() => navigate('/dashboard'), 2000);
+        } catch (err: any) {
+            console.error('Auth error:', err);
+            const msg = err.response?.data?.detail || 'Authentication failed. Please try again.';
+            setAuthError(msg);
+            toast.error(msg, {
+                position: 'bottom-center',
+                style: {
+                    border: '4px solid #0A192F',
+                    padding: '16px',
+                    color: '#0A192F',
+                    background: '#FF9E9E',
+                    fontWeight: 900,
+                    borderRadius: '999px',
+                    boxShadow: '4px 4px 0px #0A192F'
+                },
+                iconTheme: {
+                    primary: '#0A192F',
+                    secondary: '#FF9E9E',
+                },
+            });
+            setIsShaking(true);
+            setTimeout(() => setIsShaking(false), 500);
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     return (
@@ -137,13 +196,27 @@ const AuthPage = () => {
                             </div>
                         )}
 
+                        {/* Error Message */}
+                        {authError && (
+                            <div className="text-center text-[#FF4D4D] text-sm font-bold bg-[#FF4D4D]/10 py-2 rounded-xl border border-[#FF4D4D]/30">
+                                {authError}
+                            </div>
+                        )}
+
                         {/* Neo-Pop Submit Button */}
                         <button
                             type="submit"
-                            className="w-full bg-[#0A192F] text-white font-black text-lg py-4 rounded-2xl mt-6 flex items-center justify-center gap-2 hover:-translate-y-1 transition-transform shadow-[4px_4px_0px_#33A1FF] hover:shadow-[6px_6px_0px_#33A1FF] active:translate-x-[4px] active:translate-y-[4px] active:shadow-none group"
+                            disabled={isLoading}
+                            className="w-full bg-[#0A192F] text-white font-black text-lg py-4 rounded-2xl mt-6 flex items-center justify-center gap-2 hover:-translate-y-1 transition-transform shadow-[4px_4px_0px_#33A1FF] hover:shadow-[6px_6px_0px_#33A1FF] active:translate-x-[4px] active:translate-y-[4px] active:shadow-none group disabled:opacity-70 disabled:cursor-not-allowed"
                         >
-                            {isLogin ? 'Enter Studio' : 'Create Account'}
-                            <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                            {isLoading ? (
+                                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                            ) : (
+                                <>
+                                    {isLogin ? 'Enter Studio' : 'Create Account'}
+                                    <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                                </>
+                            )}
                         </button>
                     </form>
 
@@ -179,36 +252,13 @@ const AuthPage = () => {
                 </div>
             )}
 
-            {/* Embedded CSS for specific brutalist/pop animations */}
+            {/* Embedded CSS for confetti pop animation (unique to this page) */}
             <style dangerouslySetInnerHTML={{
                 __html: `
-        @keyframes float {
-          0%, 100% { transform: translateY(0) rotate(var(--tw-rotate, 0deg)); }
-          50% { transform: translateY(-15px) rotate(calc(var(--tw-rotate, 0deg) + 5deg)); }
-        }
-        @keyframes modalIn {
-          0% { opacity: 0; transform: scale(0.85) translateY(30px); }
-          100% { opacity: 1; transform: scale(1) translateY(0); }
-        }
-        @keyframes shake {
-          0%, 100% { transform: translateX(0); }
-          20%, 60% { transform: translateX(-8px) rotate(-1deg); }
-          40%, 80% { transform: translateX(8px) rotate(1deg); }
-        }
         @keyframes pop {
           0% { transform: translate(0, 0) scale(0) rotate(0deg); opacity: 1; }
           70% { opacity: 1; }
           100% { transform: translate(var(--tx), var(--ty)) scale(1.5) rotate(var(--rot)); opacity: 0; }
-        }
-        
-        .animate-float {
-          animation: float 6s ease-in-out infinite;
-        }
-        .animate-modal-in {
-          animation: modalIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
-        }
-        .animate-shake {
-          animation: shake 0.4s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
         }
       `}} />
         </div>

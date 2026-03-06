@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
     Wand2,
@@ -18,7 +18,7 @@ import {
     Eye,
     Layers
 } from 'lucide-react';
-import { generateSeries, analyzeSeries } from '../services/api';
+import { generateSeries, analyzeSeries, getDirections } from '../services/api';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -50,12 +50,12 @@ const AUDIENCE_OPTIONS: AudienceOption[] = [
     { id: 'corporate', label: 'Professionals', emoji: '💼', desc: 'B2B · Insight-driven, data-backed', color: '#0A192F' },
 ];
 
-const DIRECTIONS: Direction[] = [
+const FALLBACK_DIRECTIONS: Direction[] = [
     {
         id: 'slow-burn',
         title: 'The Slow Burn',
         tagline: 'Build tension, then ignite.',
-        reason: 'Opens with an ordinary world that feels slightly wrong. Each episode peels back one layer, keeping viewers hooked through creeping dread and earned payoffs. Best for mystery, drama, or psychological stories.',
+        reason: 'Opens with an ordinary world that feels slightly wrong. Each episode peels back one layer, keeping viewers hooked through creeping dread and earned payoffs.',
         color: '#FF9E9E',
         icon: <Layers className="w-6 h-6" />,
     },
@@ -63,7 +63,7 @@ const DIRECTIONS: Direction[] = [
         id: 'in-medias-res',
         title: 'In Medias Res',
         tagline: 'Drop into the chaos. Explain later.',
-        reason: 'Episode 1 starts at the most intense moment of the story. Viewers are disoriented in the best way — they must watch the next part to understand how we got here. Perfect for action, thrillers, and short-form hooks.',
+        reason: 'Episode 1 starts at the most intense moment of the story. Viewers are disoriented in the best way — they must watch the next part.',
         color: '#33A1FF',
         icon: <Zap className="w-6 h-6" />,
     },
@@ -71,7 +71,7 @@ const DIRECTIONS: Direction[] = [
         id: 'revelation-arc',
         title: 'The Revelation Arc',
         tagline: 'One secret. Revealed in pieces.',
-        reason: 'A central mystery is seeded in episode 1 and a new clue drops every episode. The audience becomes detectives. Ideal for conspiracy, sci-fi, or character-driven reveals that reward binge-watching.',
+        reason: 'A central mystery is seeded in episode 1 and a new clue drops every episode. The audience becomes detectives.',
         color: '#D4FF33',
         icon: <Eye className="w-6 h-6" />,
     },
@@ -86,7 +86,10 @@ const PROCESS_STEPS = [
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-const EpisenseInputCanvas = () => {
+const DIRECTION_ICONS = [<Layers className="w-6 h-6" />, <Zap className="w-6 h-6" />, <Eye className="w-6 h-6" />];
+const DIRECTION_COLORS = ['#FF9E9E', '#33A1FF', '#D4FF33'];
+
+const StoryInputPage = () => {
     const navigate = useNavigate();
 
     // Core inputs
@@ -97,11 +100,19 @@ const EpisenseInputCanvas = () => {
     // Directions popup
     const [showDirections, setShowDirections] = useState(false);
     const [selectedDirection, setSelectedDirection] = useState<string | null>(null);
+    const [directions, setDirections] = useState<Direction[]>(FALLBACK_DIRECTIONS);
+    const [loadingDirections, setLoadingDirections] = useState(false);
 
     // Processing overlay
     const [isProcessing, setIsProcessing] = useState(false);
     const [processStep, setProcessStep] = useState(0);
     const [progressPct, setProgressPct] = useState(0);
+
+    // Error toast
+    const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+    // Page title
+    useEffect(() => { document.title = 'Story Input — VBOX Episense'; }, []);
 
     // ── Handlers ──────────────────────────────────────────────────────────────
 
@@ -119,11 +130,29 @@ const EpisenseInputCanvas = () => {
         }, 15);
     };
 
-    // Step 1: user clicks "Architect" → open directions popup
-    const handleArchitect = () => {
+    // Step 1: user clicks "Architect" → fetch directions from API, then show popup
+    const handleArchitect = async () => {
         if (!concept.trim() || !selectedAudience) return;
-        setShowDirections(true);
         setSelectedDirection(null);
+        setLoadingDirections(true);
+        setShowDirections(true);
+
+        try {
+            const res = await getDirections(concept);
+            const mapped: Direction[] = res.suggested_directions.map((d, i) => ({
+                id: `dir-${i}`,
+                title: d.direction_name,
+                tagline: d.category,
+                reason: d.why_it_fits,
+                color: DIRECTION_COLORS[i % DIRECTION_COLORS.length],
+                icon: DIRECTION_ICONS[i % DIRECTION_ICONS.length],
+            }));
+            setDirections(mapped);
+        } catch {
+            setDirections(FALLBACK_DIRECTIONS);
+        } finally {
+            setLoadingDirections(false);
+        }
     };
 
     // Step 2: user picks a direction → start processing + API calls
@@ -177,6 +206,10 @@ const EpisenseInputCanvas = () => {
             setProgressPct(100);
             setTimeout(() => setProcessStep(4), 100);
 
+            // Show error toast
+            setErrorMsg('Generation failed — showing demo data instead.');
+            setTimeout(() => setErrorMsg(null), 4000);
+
             // Fallback: navigate without data so app doesn't break
             setTimeout(() => {
                 setIsProcessing(false);
@@ -189,7 +222,7 @@ const EpisenseInputCanvas = () => {
 
     const canArchitect = concept.trim().length > 0 && selectedAudience !== null;
     const selectedAudienceObj = AUDIENCE_OPTIONS.find(a => a.id === selectedAudience);
-    const selectedDirectionObj = DIRECTIONS.find(d => d.id === selectedDirection);
+    const selectedDirectionObj = directions.find(d => d.id === selectedDirection);
 
     return (
         <div className="min-h-screen bg-[#FDFBF7] text-[#0A192F] font-sans relative overflow-x-hidden selection:bg-[#33A1FF] selection:text-white pb-20">
@@ -203,7 +236,7 @@ const EpisenseInputCanvas = () => {
                 {/* ── Nav ── */}
                 <nav className="flex justify-between items-center mb-12">
                     <button
-                        onClick={() => navigate('/')}
+                        onClick={() => navigate('/dashboard')}
                         className="flex items-center gap-3 font-black uppercase text-sm hover:-translate-x-2 transition-transform">
                         <div className="w-10 h-10 bg-[#FF9E9E] border-2 border-[#0A192F] rounded-full flex items-center justify-center shadow-[2px_2px_0px_#0A192F]">
                             <ArrowLeft className="w-5 h-5 text-[#0A192F]" />
@@ -411,7 +444,12 @@ const EpisenseInputCanvas = () => {
 
                         {/* Direction Cards */}
                         <div className="space-y-3 mb-6">
-                            {DIRECTIONS.map((dir, idx) => {
+                            {loadingDirections ? (
+                                <div className="flex flex-col items-center justify-center py-12">
+                                    <div className="w-10 h-10 border-4 border-[#0A192F] border-t-[#D4FF33] rounded-full animate-spin mb-4"></div>
+                                    <p className="font-black text-sm uppercase tracking-widest text-[#0A192F]/50">Analyzing story directions...</p>
+                                </div>
+                            ) : directions.map((dir: Direction, idx: number) => {
                                 const isSelected = selectedDirection === dir.id;
                                 return (
                                     <button
@@ -425,7 +463,7 @@ const EpisenseInputCanvas = () => {
                                         style={isSelected ? { backgroundColor: dir.color, borderWidth: '3px' } : { borderWidth: '3px' }}
                                     >
                                         <div className="flex items-start gap-4">
-                                            <div className={`w-10 h-10 rounded-xl border-2 border-[#0A192F] flex items-center justify-center flex-shrink-0 mt-0.5 shadow-[2px_2px_0px_#0A192F] transition-colors ${isSelected ? 'bg-[#0A192F] text-white' : 'bg-[#FDFBF7]'}`}>
+                                            <div className={`w-10 h-10 rounded-xl border-2 border-[#0A192F] flex items-center justify-center shrink-0 mt-0.5 shadow-[2px_2px_0px_#0A192F] transition-colors ${isSelected ? 'bg-[#0A192F] text-white' : 'bg-[#FDFBF7]'}`}>
                                                 {dir.icon}
                                             </div>
                                             <div className="flex-1">
@@ -446,18 +484,27 @@ const EpisenseInputCanvas = () => {
                         </div>
 
                         {/* Generate CTA */}
-                        <button
-                            onClick={handleGenerate}
-                            disabled={!selectedDirection}
-                            className="w-full bg-[#0A192F] text-white font-black text-lg py-5 rounded-2xl flex items-center justify-center gap-3 disabled:opacity-40 disabled:cursor-not-allowed shadow-[4px_4px_0px_#33A1FF] hover:shadow-[6px_6px_0px_#33A1FF] hover:-translate-y-0.5 active:translate-y-[4px] active:translate-x-[4px] active:shadow-none transition-all group"
-                        >
-                            <BrainCircuit className="w-5 h-5" />
-                            {selectedDirection
-                                ? `Generate with "${selectedDirectionObj?.title}"`
-                                : 'Select a Direction Above'}
-                            <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-                        </button>
+                        {!loadingDirections && (
+                            <button
+                                onClick={handleGenerate}
+                                disabled={!selectedDirection}
+                                className="w-full bg-[#0A192F] text-white font-black text-lg py-5 rounded-2xl flex items-center justify-center gap-3 disabled:opacity-40 disabled:cursor-not-allowed shadow-[4px_4px_0px_#33A1FF] hover:shadow-[6px_6px_0px_#33A1FF] hover:-translate-y-0.5 active:translate-y-[4px] active:translate-x-[4px] active:shadow-none transition-all group"
+                            >
+                                <BrainCircuit className="w-5 h-5" />
+                                {selectedDirection
+                                    ? `Generate with "${selectedDirectionObj?.title}"`
+                                    : 'Select a Direction Above'}
+                                <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                            </button>
+                        )}
                     </div>
+                </div>
+            )}
+
+            {/* Error Toast */}
+            {errorMsg && (
+                <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-60 bg-[#FF4D4D] text-white border-4 border-[#0A192F] rounded-full px-6 py-3 font-black text-sm uppercase shadow-[4px_4px_0px_#0A192F] animate-fade-in">
+                    {errorMsg}
                 </div>
             )}
 
@@ -491,7 +538,7 @@ const EpisenseInputCanvas = () => {
                                 style={{ width: `${progressPct}%` }}
                             >
                                 {/* Shimmer on the bar */}
-                                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent animate-shimmer" />
+                                <div className="absolute inset-0 bg-linear-to-r from-transparent via-white/30 to-transparent animate-shimmer" />
                             </div>
                         </div>
                     </div>
@@ -515,7 +562,7 @@ const EpisenseInputCanvas = () => {
                                     >
                                         {/* Step indicator */}
                                         <div
-                                            className={`w-7 h-7 rounded-full border-2 border-[#0A192F] flex items-center justify-center flex-shrink-0 transition-all duration-500 ${active ? 'scale-110' : ''}`}
+                                            className={`w-7 h-7 rounded-full border-2 border-[#0A192F] flex items-center justify-center shrink-0 transition-all duration-500 ${active ? 'scale-110' : ''}`}
                                             style={active ? { backgroundColor: step.color } : { backgroundColor: 'transparent' }}
                                         >
                                             {active
@@ -527,7 +574,7 @@ const EpisenseInputCanvas = () => {
                                             {step.label}
                                         </span>
                                         {active && (
-                                            <CheckCircle2 className="w-4 h-4 ml-auto flex-shrink-0 text-[#0A192F]" />
+                                            <CheckCircle2 className="w-4 h-4 ml-auto shrink-0 text-[#0A192F]" />
                                         )}
                                     </div>
                                 );
@@ -566,7 +613,7 @@ const EpisenseInputCanvas = () => {
                 </div>
             </div>
 
-            {/* ── Styles ── */}
+            {/* ── Styles (page-specific only) ── */}
             <style dangerouslySetInnerHTML={{
                 __html: `
           @keyframes shine {
@@ -576,28 +623,12 @@ const EpisenseInputCanvas = () => {
             0% { transform: translateX(-100%); }
             100% { transform: translateX(400%); }
           }
-          @keyframes popIn {
-            0% { transform: scaleY(0); opacity: 0; transform-origin: bottom; }
-            70% { transform: scaleY(1.1); opacity: 1; }
-            100% { transform: scaleY(1); opacity: 1; }
-          }
-          @keyframes modalIn {
-            0% { opacity: 0; transform: scale(0.9) translateY(24px); }
-            100% { opacity: 1; transform: scale(1) translateY(0); }
-          }
-          @keyframes fadeIn {
-            0% { opacity: 0; }
-            100% { opacity: 1; }
-          }
           .animate-shine { animation: shine 1.5s ease-in-out infinite; }
           .animate-shimmer { animation: shimmer 1.4s ease-in-out infinite; }
-          .animate-pop-in { animation: popIn 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; opacity: 0; }
-          .animate-modal-in { animation: modalIn 0.4s cubic-bezier(0.34, 1.2, 0.64, 1) forwards; }
-          .animate-fade-in { animation: fadeIn 0.25s ease-out forwards; }
           .border-3 { border-width: 3px; }
         `}} />
         </div>
     );
 };
 
-export default EpisenseInputCanvas;
+export default StoryInputPage;

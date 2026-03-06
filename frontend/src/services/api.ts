@@ -3,7 +3,23 @@
  * Types match the BACKEND_INTEGRATION_GUIDE.md output format exactly.
  */
 
+import axios from 'axios';
+
 const API_BASE = "http://localhost:8000/api/v1";
+
+export const api = axios.create({
+    baseURL: API_BASE,
+    headers: { 'Content-Type': 'application/json' }
+});
+
+// Auto-attach JWT token if present
+api.interceptors.request.use((config) => {
+    const token = localStorage.getItem('episense_token');
+    if (token && config.headers) {
+        config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+});
 
 // ─── Types matching backend schemas (BACKEND_INTEGRATION_GUIDE.md) ───
 
@@ -219,15 +235,13 @@ export async function analyzeSeries(episodes: GeneratedEpisode[], category?: str
 }
 
 export async function listProjects(): Promise<ProjectResponse[]> {
-    const res = await fetch(`${API_BASE}/projects`);
-    if (!res.ok) throw new Error(`Listing projects failed: ${res.statusText}`);
-    return res.json();
+    const res = await api.get<ProjectResponse[]>('/projects');
+    return res.data;
 }
 
 export async function getProject(id: string): Promise<ProjectResponse> {
-    const res = await fetch(`${API_BASE}/projects/${id}`);
-    if (!res.ok) throw new Error(`Get project failed: ${res.statusText}`);
-    return res.json();
+    const res = await api.get<ProjectResponse>(`/projects/${id}`);
+    return res.data;
 }
 
 export async function createProject(data: {
@@ -237,16 +251,13 @@ export async function createProject(data: {
     generated_series: GeneratedSeries | null;
     analysis: SeriesAnalysis | null;
 }): Promise<ProjectResponse> {
-    const res = await fetch(`${API_BASE}/projects`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-    });
-    if (!res.ok) throw new Error(`Create project failed: ${res.statusText}`);
-    return res.json();
+    console.log("[API] createProject called → data:", data);
+    console.log("[API] Current auth header will be:",
+        localStorage.getItem('episense_token') ? 'present' : 'MISSING');
+    const res = await api.post<ProjectResponse>('/projects', data);
+    return res.data;
 }
 
 export async function deleteProject(id: string): Promise<void> {
-    const res = await fetch(`${API_BASE}/projects/${id}`, { method: "DELETE" });
-    if (!res.ok) throw new Error(`Delete project failed: ${res.statusText}`);
+    await api.delete(`/projects/${id}`);
 }

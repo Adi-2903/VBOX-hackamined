@@ -17,7 +17,12 @@ from app.models.schemas import (
     SeriesAnalysis,
     DirectionsResponse,
 )
-from app.dummy_data import generate_dummy_series, generate_dummy_directions, analyze_dummy_episode, analyze_dummy_series
+from app.services.llm import (
+    generate_directions_async,
+    generate_series_async,
+    analyze_episode_async,
+    analyze_series_async
+)
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +47,7 @@ async def get_directions(req: dict):
 
     start = time.time()
     logger.info(f"Generating directions — concept length: {len(concept)}")
-    data = generate_dummy_directions(concept)
+    data = await generate_directions_async(concept)
     logger.info(f"Directions generated — {time.time() - start:.2f}s")
     return data
 
@@ -59,7 +64,13 @@ async def generate_series(req: StoryPromptRequest):
     start = time.time()
     logger.info(f"Generating series — concept length: {len(req.concept)}, episodes: {req.num_episodes}, audience: {req.audience}, direction: {req.direction}")
 
-    data = generate_dummy_series(req.concept, req.num_episodes, req.direction, req.audience)
+    data = await generate_series_async(
+        concept=req.concept,
+        num_episodes=req.num_episodes,
+        genres=req.genres,
+        audience=req.audience,
+        direction=req.direction
+    )
 
     logger.info(f"Generation complete — {time.time() - start:.2f}s")
     return data
@@ -85,7 +96,7 @@ async def analyze_content(req: AnalysisRequest):
     start = time.time()
     logger.info(f"Starting analysis — Category: {req.category}, Length: {len(req.text)}")
 
-    result = analyze_dummy_episode(text=req.text, category=req.category)
+    result = await analyze_episode_async(text=req.text, category=req.category or "mixed")
 
     duration = time.time() - start
     logger.info(f"Analysis complete — Duration: {duration:.2f}s, Score: {result['summary']['overall_score']}")
@@ -109,7 +120,7 @@ async def analyze_series(payload: AnalyzeSeriesRequest):
     start = time.time()
     logger.info(f"Analyzing series — {len(payload.episodes)} episodes")
 
-    result = analyze_dummy_series(payload.episodes, payload.category)
+    result = await analyze_series_async(episodes=payload.episodes, category=payload.category or "mixed")
 
     duration = time.time() - start
     logger.info(f"Series analysis complete — Duration: {duration:.2f}s, Avg score: {result['series_insights']['avg_overall_score']}")

@@ -9,10 +9,14 @@ import {
     Smartphone,
     CheckCircle2
 } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
 
-const App = () => {
+const LandingPage = () => {
     const navigate = useNavigate();
+    const { isAuthenticated } = useAuth();
     const [activeTab, setActiveTab] = useState(0);
+
+    useEffect(() => { document.title = 'VBOX Episense — AI Story Intelligence'; }, []);
 
     // Auto-switch tabs in the demo section
     useEffect(() => {
@@ -38,9 +42,9 @@ const App = () => {
                     <a href="#demo" className="hover:text-[#33A1FF] transition-colors">How it Works</a>
                 </div>
                 <button
-                    onClick={() => navigate('/auth')}
+                    onClick={() => navigate(isAuthenticated ? '/dashboard' : '/auth')}
                     className="bg-[#D4FF33] border-2 border-[#0A192F] text-[#0A192F] px-6 py-2 rounded-full font-bold text-sm hover:bg-[#C2FA00] transition-colors shadow-[2px_2px_0px_#0A192F] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none">
-                    Try the Beta
+                    {isAuthenticated ? 'Open Studio' : 'Try the Beta'}
                 </button>
             </nav>
 
@@ -74,7 +78,7 @@ const App = () => {
 
                     <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
                         <button
-                            onClick={() => navigate('/auth')}
+                            onClick={() => navigate(isAuthenticated ? '/dashboard' : '/auth')}
                             className="bg-[#0A192F] text-white text-lg font-bold px-8 py-4 rounded-full flex items-center justify-center gap-3 hover:-translate-y-1 transition-transform shadow-[4px_4px_0px_#FF9E9E]">
                             <Smartphone className="w-5 h-5" /> Start Analyzing
                         </button>
@@ -343,4 +347,4 @@ const App = () => {
     );
 };
 
-export default App;
+export default LandingPage;
