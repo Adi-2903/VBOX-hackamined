@@ -32,6 +32,8 @@ class AnalysisRequest(BaseModel):
     """Single episode analysis request matching the integration guide."""
     text: str = Field(..., description="Episode story content to analyze")
     category: str | None = Field(default=None, description="Content category: crime, romance, horror, thriller, drama, comedy")
+    hook: str | None = Field(default=None, description="Optional episode hook metadata")
+    cliffhanger: str | None = Field(default=None, description="Optional episode cliffhanger metadata")
 
 
 # ──────────────────────────────────────────────
@@ -183,6 +185,12 @@ class SeriesInsights(BaseModel):
     consistency_score: float
     weakest_episode: int
     strongest_episode: int
+
+
+class AnalyzeSeriesRequest(BaseModel):
+    """Batch analysis request for a full series."""
+    episodes: list[GeneratedEpisode]
+    category: str | None = None
 
 
 class SeriesAnalysis(BaseModel):

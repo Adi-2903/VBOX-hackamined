@@ -4,3 +4,10 @@ motor
 pydantic
 pydantic-settings
 python-dotenv
+spacy>=3.5.0
+transformers>=4.30.0
+sentence-transformers>=2.2.0
+scikit-learn>=1.2.0
+numpy>=1.24.0
+torch>=2.0.0
+httpx

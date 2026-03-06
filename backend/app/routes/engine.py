@@ -6,12 +6,14 @@ Includes input validation, logging, and async support as recommended by the guid
 """
 import logging
 import time
+import asyncio
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from app.models.schemas import (
     StoryPromptRequest,
     AnalysisRequest,
+    AnalyzeSeriesRequest,
     GeneratedSeries,
     EpisodeAnalysis,
     SeriesAnalysis,
@@ -19,10 +21,9 @@ from app.models.schemas import (
 )
 from app.services.llm import (
     generate_directions_async,
-    generate_series_async,
-    analyze_episode_async,
-    analyze_series_async
+    generate_series_async
 )
+from app.ml_engine.ml_pipeline_v2 import analyze_episode_v2, analyze_series_v2
 
 logger = logging.getLogger(__name__)
 
@@ -83,10 +84,8 @@ async def generate_series(req: StoryPromptRequest):
 @router.post("/analyze", response_model=EpisodeAnalysis)
 async def analyze_content(req: AnalysisRequest):
     """
-    Analyze single episode content for retention prediction.
-    Matches the exact API from BACKEND_INTEGRATION_GUIDE.md:
-        POST /api/analyze  { text, category }
-    Currently returns dummy data — swap with ml_pipeline_v2.analyze_episode_v2() later.
+    Analyze single episode content for retention prediction using the ML engine.
+    Matches the exact API from BACKEND_INTEGRATION_GUIDE.md and supports metadata.
     """
     if not req.text or not isinstance(req.text, str):
         raise HTTPException(status_code=400, detail="Text must be a non-empty string")
@@ -94,34 +93,80 @@ async def analyze_content(req: AnalysisRequest):
         raise HTTPException(status_code=400, detail=f"Text exceeds maximum length of {MAX_TEXT_LENGTH}")
 
     start = time.time()
-    logger.info(f"Starting analysis — Category: {req.category}, Length: {len(req.text)}")
+    logger.info(f"Starting ML analysis — Category: {req.category}, Length: {len(req.text)}")
 
-    result = await analyze_episode_async(text=req.text, category=req.category or "mixed")
+    # Run ML pipeline in a thread pool to avoid blocking the event loop
+    try:
+        result = await asyncio.to_thread(
+            analyze_episode_v2,
+            text=req.text,
+            category=req.category,
+            hook=req.hook,
+            cliffhanger=req.cliffhanger
+        )
+    except Exception as e:
+        logger.error(f"ML Analysis failed: {e}")
+        raise HTTPException(status_code=500, detail=f"ML Engine error: {str(e)}")
 
     duration = time.time() - start
-    logger.info(f"Analysis complete — Duration: {duration:.2f}s, Score: {result['summary']['overall_score']}")
+    logger.info(f"ML Analysis complete — Duration: {duration:.2f}s, Score: {result['summary']['overall_score']}")
     return result
-
-
-class AnalyzeSeriesRequest(BaseModel):
-    episodes: list[dict]
-    category: str | None = None
 
 
 @router.post("/analyze-series", response_model=SeriesAnalysis)
 async def analyze_series(payload: AnalyzeSeriesRequest):
     """
-    Analyze an entire series of episodes.
-    Currently returns dummy data — swap with ml_pipeline_v2.analyze_series_v2() later.
+    Analyze an entire series of episodes using the ML engine.
     """
     if not payload.episodes:
         raise HTTPException(status_code=400, detail="Episodes list must not be empty")
 
     start = time.time()
-    logger.info(f"Analyzing series — {len(payload.episodes)} episodes")
+    logger.info(f"Analyzing series with ML — {len(payload.episodes)} episodes")
 
-    result = await analyze_series_async(episodes=payload.episodes, category=payload.category or "mixed")
+    # Prepare episode texts and metadata for the ML engine
+    # analyze_series_v2 currently takes a list of strings, but we should probably 
+    # process them to match what the frontend expects or what the ML engine needs.
+    # Looking at ml_pipeline_v2.py: analyze_series_v2(episodes: list[str])
+    
+    # However, SeriesAnalysis expects EpisodeAnalysisWithMeta which includes title, etc.
+    # So we'll loop and call analyze_episode_v2 for each to keep metadata.
+    
+    try:
+        episode_analyses = []
+        for ep in payload.episodes:
+            # Run each analysis in a thread
+            res = await asyncio.to_thread(
+                analyze_episode_v2,
+                text=ep.story,
+                category=payload.category,
+                hook=ep.hook,
+                cliffhanger=ep.cliffhanger
+            )
+            episode_analyses.append({
+                "episode_number": ep.episode_number,
+                "title": ep.title,
+                "analysis": res
+            })
+        
+        # We need to compute series insights manually since we called individual episodes
+        # to preserve titles and episode numbers in the response format.
+        from app.ml_engine.ml_pipeline_v2 import _compute_series_insights
+        series_insights_raw = _compute_series_insights([ea["analysis"] for ea in episode_analyses])
+        
+        # Add weakest/strongest which might be missing from raw insights
+        scores = [ea["analysis"]["summary"]["overall_score"] for ea in episode_analyses]
+        series_insights_raw["weakest_episode"] = scores.index(min(scores)) + 1 if scores else 1
+        series_insights_raw["strongest_episode"] = scores.index(max(scores)) + 1 if scores else 1
+
+        result = {
+            "episodes": episode_analyses,
+            "series_insights": series_insights_raw
+        }
+    except Exception as e:
+        logger.error(f"ML Series Analysis failed: {e}")
+        raise HTTPException(status_code=500, detail=f"ML Engine error: {str(e)}")
 
     duration = time.time() - start
-    logger.info(f"Series analysis complete — Duration: {duration:.2f}s, Avg score: {result['series_insights']['avg_overall_score']}")
+    logger.info(f"Series ML analysis complete — Duration: {duration:.2f}s, Avg score: {result['series_insights'].get('avg_overall_score')}")
     return result
