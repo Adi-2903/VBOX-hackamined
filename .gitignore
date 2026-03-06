@@ -1,91 +1,21 @@
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
-
-# Virtual Environment
-venv/
-env/
-ENV/
-.venv
-
 # IDE
 .vscode/
 .idea/
 *.swp
 *.swo
-*~
+
+# OS
 .DS_Store
+Thumbs.db
 
-# Jupyter Notebook
-.ipynb_checkpoints
+# Virtual Environments
+venv/
+.venv/
+env/
 
-# Model Cache
-.cache/
-cache/
-models/
-*.pkl
-*.pth
-*.h5
-*.onnx
-
-# HuggingFace Cache
-.transformers_cache/
-
-# MyPy
-.mypy_cache/
-.dmypy.json
-dmypy.json
-
-# Testing
-.pytest_cache/
-.coverage
-htmlcov/
-*.cover
+# Python
+__pycache__/
+*.py[cod]
 
 # Logs
 *.log
-logs/
-
-# Training Data (large files)
-training/data/*.csv
-training/data/*.json
-training/models/
-
-# Environment variables
-.env
-.env.local
-
-# OS
-Thumbs.db
-.DS_Store
-
-# Temporary files
-*.tmp
-*.temp
-temp/
-tmp/
-
-# Analysis outputs
-*_analysis.json
-example_story_analysis.json
-
-# PDFs (documentation)
-*.pdf
