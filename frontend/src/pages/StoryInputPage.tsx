@@ -8,20 +8,103 @@ import {
     Play,
     PenTool,
     BrainCircuit,
-    Timer
+    Timer,
+    Users,
+    User,
+    ArrowRight,
+    CheckCircle2,
+    X,
+    Compass,
+    Zap,
+    Eye,
+    Layers
 } from 'lucide-react';
+
+// ─── Types ───────────────────────────────────────────────────────────────────
+
+type AudienceOption = {
+    id: string;
+    label: string;
+    emoji: string;
+    desc: string;
+    color: string;
+};
+
+type Direction = {
+    id: string;
+    title: string;
+    tagline: string;
+    reason: string;
+    color: string;
+    icon: React.ReactNode;
+};
+
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+const AUDIENCE_OPTIONS: AudienceOption[] = [
+    { id: 'myself', label: 'Just Me', emoji: '✍️', desc: 'Personal journal / passion project', color: '#C7B9FF' },
+    { id: 'genz', label: 'Gen Z', emoji: '⚡', desc: '18–25 · Fast, punchy, raw energy', color: '#D4FF33' },
+    { id: 'millennials', label: 'Millennials', emoji: '🎯', desc: '25–40 · Relatable, nostalgic, layered', color: '#33A1FF' },
+    { id: 'adults', label: 'Adults 40+', emoji: '🧭', desc: '40+ · Deep narrative, rich context', color: '#FF9E9E' },
+    { id: 'families', label: 'Families', emoji: '🏠', desc: 'All ages · Warm, inclusive, safe', color: '#FFD700' },
+    { id: 'corporate', label: 'Professionals', emoji: '💼', desc: 'B2B · Insight-driven, data-backed', color: '#0A192F' },
+];
+
+const DIRECTIONS: Direction[] = [
+    {
+        id: 'slow-burn',
+        title: 'The Slow Burn',
+        tagline: 'Build tension, then ignite.',
+        reason: 'Opens with an ordinary world that feels slightly wrong. Each episode peels back one layer, keeping viewers hooked through creeping dread and earned payoffs. Best for mystery, drama, or psychological stories.',
+        color: '#FF9E9E',
+        icon: <Layers className="w-6 h-6" />,
+    },
+    {
+        id: 'in-medias-res',
+        title: 'In Medias Res',
+        tagline: 'Drop into the chaos. Explain later.',
+        reason: 'Episode 1 starts at the most intense moment of the story. Viewers are disoriented in the best way — they must watch the next part to understand how we got here. Perfect for action, thrillers, and short-form hooks.',
+        color: '#33A1FF',
+        icon: <Zap className="w-6 h-6" />,
+    },
+    {
+        id: 'revelation-arc',
+        title: 'The Revelation Arc',
+        tagline: 'One secret. Revealed in pieces.',
+        reason: 'A central mystery is seeded in episode 1 and a new clue drops every episode. The audience becomes detectives. Ideal for conspiracy, sci-fi, or character-driven reveals that reward binge-watching.',
+        color: '#D4FF33',
+        icon: <Eye className="w-6 h-6" />,
+    },
+];
+
+const PROCESS_STEPS = [
+    { label: 'Decomposing entities & timeline...', color: '#33A1FF' },
+    { label: 'Mapping emotional trajectory...', color: '#FF9E9E' },
+    { label: 'Applying narrative direction...', color: '#C7B9FF' },
+    { label: 'Slicing into vertical arcs...', color: '#D4FF33' },
+];
+
+// ─── Component ────────────────────────────────────────────────────────────────
 
 const EpisenseInputCanvas = () => {
     const navigate = useNavigate();
+
+    // Core inputs
     const [concept, setConcept] = useState('');
     const [episodes, setEpisodes] = useState(5);
-    const [selectedGenres, setSelectedGenres] = useState(['Thriller']);
+    const [selectedAudience, setSelectedAudience] = useState<string | null>(null);
+
+    // Directions popup
+    const [showDirections, setShowDirections] = useState(false);
+    const [selectedDirection, setSelectedDirection] = useState<string | null>(null);
+
+    // Processing overlay
     const [isProcessing, setIsProcessing] = useState(false);
     const [processStep, setProcessStep] = useState(0);
+    const [progressPct, setProgressPct] = useState(0);
 
-    const availableGenres = ['Thriller', 'Sci-Fi', 'Rom-Com', 'Horror', 'Drama', 'Lore/Myth'];
+    // ── Handlers ──────────────────────────────────────────────────────────────
 
-    // Magic Auto-fill for demo purposes
     const handleMagicFill = () => {
         const idea = "A deep-sea welder discovers a completely dry, oxygen-rich room inside a sunken 1800s galleon. On a wooden desk sits a modern smartphone, plugged into a wall outlet that shouldn't exist. Suddenly, the phone starts ringing. The caller ID says it's his daughter, who is supposed to be asleep on the surface.";
         let i = 0;
@@ -36,43 +119,59 @@ const EpisenseInputCanvas = () => {
         }, 15);
     };
 
-    const toggleGenre = (genre: string) => {
-        setSelectedGenres(prev =>
-            prev.includes(genre)
-                ? prev.filter(g => g !== genre)
-                : [...prev, genre]
-        );
+    // Step 1: user clicks "Architect" → open directions popup
+    const handleArchitect = () => {
+        if (!concept.trim() || !selectedAudience) return;
+        setShowDirections(true);
+        setSelectedDirection(null);
     };
 
-    const handleArchitect = () => {
-        if (!concept.trim()) return;
+    // Step 2: user picks a direction → start processing
+    const handleGenerate = () => {
+        if (!selectedDirection) return;
+        setShowDirections(false);
         setIsProcessing(true);
+        setProcessStep(0);
+        setProgressPct(0);
 
-        // Simulate engine processing steps
-        setTimeout(() => setProcessStep(1), 800);  // Tokenizing
-        setTimeout(() => setProcessStep(2), 1600); // Emotional Arc
-        setTimeout(() => setProcessStep(3), 2500); // Slicing Episodes
+        // Smooth progress bar
+        let pct = 0;
+        const ticker = setInterval(() => {
+            pct += 1;
+            setProgressPct(pct);
+            if (pct >= 100) clearInterval(ticker);
+        }, 30);
 
-        // Reset/Redirect mock
+        // Step reveals
+        setTimeout(() => setProcessStep(1), 700);
+        setTimeout(() => setProcessStep(2), 1500);
+        setTimeout(() => setProcessStep(3), 2400);
+        setTimeout(() => setProcessStep(4), 3000);
+
+        // Navigate when done
         setTimeout(() => {
             setIsProcessing(false);
             setProcessStep(0);
+            setProgressPct(0);
             setConcept('');
             navigate('/breakdown');
-        }, 3500);
+        }, 3800);
     };
+
+    const canArchitect = concept.trim().length > 0 && selectedAudience !== null;
+    const selectedAudienceObj = AUDIENCE_OPTIONS.find(a => a.id === selectedAudience);
+    const selectedDirectionObj = DIRECTIONS.find(d => d.id === selectedDirection);
 
     return (
         <div className="min-h-screen bg-[#FDFBF7] text-[#0A192F] font-sans relative overflow-x-hidden selection:bg-[#33A1FF] selection:text-white pb-20">
 
             {/* Neo-Pop Dotted Background */}
             <div className="fixed inset-0 z-0 pointer-events-none opacity-[0.15]"
-                style={{ backgroundImage: 'radial-gradient(#0A192F 2px, transparent 2px)', backgroundSize: '24px 24px' }}>
-            </div>
+                style={{ backgroundImage: 'radial-gradient(#0A192F 2px, transparent 2px)', backgroundSize: '24px 24px' }} />
 
             <div className="max-w-7xl mx-auto px-6 pt-8 relative z-10">
 
-                {/* Studio Navigation */}
+                {/* ── Nav ── */}
                 <nav className="flex justify-between items-center mb-12">
                     <button
                         onClick={() => navigate('/')}
@@ -84,27 +183,24 @@ const EpisenseInputCanvas = () => {
                     </button>
 
                     <div className="bg-white border-2 border-[#0A192F] rounded-full px-4 py-2 shadow-[2px_2px_0px_#0A192F] flex items-center gap-3">
-                        <div className="w-2 h-2 rounded-full bg-[#D4FF33] animate-pulse"></div>
+                        <div className="w-2 h-2 rounded-full bg-[#D4FF33] animate-pulse" />
                         <span className="font-mono text-xs font-bold uppercase tracking-widest">VBOX Engine Ready</span>
                     </div>
                 </nav>
 
-                {/* Page Header */}
+                {/* ── Header ── */}
                 <div className="mb-10">
-                    <h1 className="text-5xl md:text-6xl font-black tracking-tight mb-4">
-                        The Canvas.
-                    </h1>
+                    <h1 className="text-5xl md:text-6xl font-black tracking-tight mb-4">The Canvas.</h1>
                     <p className="text-xl font-medium text-[#0A192F]/60 max-w-2xl">
-                        Drop your raw narrative. We'll enforce the 90-second constraint and algorithmically structure the perfect multi-part hook.
+                        Drop your raw narrative, pick your audience, and we'll structure the perfect multi-part hook.
                     </p>
                 </div>
 
-                {/* The Bento Layout */}
+                {/* ── Bento Layout ── */}
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8">
 
-                    {/* Main Input Area (Spans 8 cols) */}
+                    {/* Main Input — 8 cols */}
                     <div className="lg:col-span-8 bg-white border-4 border-[#0A192F] rounded-[2.5rem] p-6 md:p-8 shadow-[8px_8px_0px_#0A192F] relative flex flex-col group">
-
                         <div className="flex justify-between items-start mb-6">
                             <div className="flex items-center gap-3">
                                 <div className="bg-[#C7B9FF] border-2 border-[#0A192F] p-2 rounded-xl shadow-[2px_2px_0px_#0A192F]">
@@ -113,7 +209,6 @@ const EpisenseInputCanvas = () => {
                                 <h2 className="text-2xl font-black uppercase tracking-tight">Core Concept</h2>
                             </div>
 
-                            {/* Magic Button */}
                             <button
                                 onClick={handleMagicFill}
                                 className="flex items-center gap-2 bg-[#FDFBF7] border-2 border-[#0A192F] px-4 py-2 rounded-full text-sm font-bold shadow-[2px_2px_0px_#0A192F] hover:bg-[#D4FF33] active:translate-y-[2px] active:translate-x-[2px] active:shadow-none transition-all"
@@ -130,7 +225,6 @@ const EpisenseInputCanvas = () => {
                             className="flex-1 w-full min-h-[300px] bg-transparent text-2xl font-bold leading-relaxed text-[#0A192F] placeholder-[#0A192F]/20 resize-none focus:outline-none"
                         />
 
-                        {/* Live Character/Token Count */}
                         <div className="flex justify-between items-center pt-4 border-t-2 border-dashed border-[#0A192F]/20 mt-4">
                             <span className="font-mono text-xs font-bold text-[#0A192F]/50 uppercase">
                                 {concept.length === 0 ? 'Awaiting Input...' : 'Extracting Entities...'}
@@ -141,14 +235,12 @@ const EpisenseInputCanvas = () => {
                         </div>
                     </div>
 
-                    {/* Constraints & Parameters (Spans 4 cols) */}
+                    {/* Right Column — 4 cols */}
                     <div className="lg:col-span-4 flex flex-col gap-6">
 
-                        {/* Episode Constraint Block */}
+                        {/* ── Episode Stepper ── */}
                         <div className="bg-[#D4FF33] border-4 border-[#0A192F] rounded-[2rem] p-6 shadow-[6px_6px_0px_#0A192F] flex flex-col justify-between relative overflow-hidden">
-                            {/* Graphic element */}
-                            <div className="absolute -right-4 -top-4 w-24 h-24 border-4 border-[#0A192F]/10 rounded-full"></div>
-
+                            <div className="absolute -right-4 -top-4 w-24 h-24 border-4 border-[#0A192F]/10 rounded-full" />
                             <div className="relative z-10 mb-6">
                                 <div className="flex items-center gap-2 mb-1">
                                     <Timer className="w-5 h-5" />
@@ -156,8 +248,6 @@ const EpisenseInputCanvas = () => {
                                 </div>
                                 <p className="font-medium text-sm text-[#0A192F]/70">VBOX 90-second constraint enforced.</p>
                             </div>
-
-                            {/* Tactile Stepper UI */}
                             <div className="bg-white border-2 border-[#0A192F] rounded-2xl p-2 flex items-center justify-between shadow-inner relative z-10">
                                 <button
                                     onClick={() => setEpisodes(Math.max(5, episodes - 1))}
@@ -166,12 +256,10 @@ const EpisenseInputCanvas = () => {
                                 >
                                     <Minus className="w-6 h-6" />
                                 </button>
-
                                 <div className="flex flex-col items-center">
                                     <span className="text-4xl font-black leading-none">{episodes}</span>
                                     <span className="font-mono text-[10px] font-bold uppercase tracking-widest text-[#0A192F]/50">Episodes</span>
                                 </div>
-
                                 <button
                                     onClick={() => setEpisodes(Math.min(8, episodes + 1))}
                                     disabled={episodes >= 8}
@@ -182,21 +270,41 @@ const EpisenseInputCanvas = () => {
                             </div>
                         </div>
 
-                        {/* Vibe/Genre Sticker Block */}
+                        {/* ── Target Audience ── */}
                         <div className="bg-white border-4 border-[#0A192F] rounded-[2rem] p-6 shadow-[6px_6px_0px_#0A192F] flex-1">
-                            <h3 className="font-black text-xl uppercase tracking-tight mb-4">The Vibe</h3>
-                            <div className="flex flex-wrap gap-2">
-                                {availableGenres.map(genre => {
-                                    const isSelected = selectedGenres.includes(genre);
+                            <div className="flex items-center gap-2 mb-4">
+                                <div className="bg-[#FF9E9E] border-2 border-[#0A192F] p-2 rounded-xl shadow-[2px_2px_0px_#0A192F]">
+                                    <Users className="w-4 h-4" />
+                                </div>
+                                <h3 className="font-black text-xl uppercase tracking-tight">Target Audience</h3>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-2">
+                                {AUDIENCE_OPTIONS.map(opt => {
+                                    const isSelected = selectedAudience === opt.id;
+                                    const isPersonal = opt.id === 'myself';
                                     return (
                                         <button
-                                            key={genre}
-                                            onClick={() => toggleGenre(genre)}
-                                            className={`px-4 py-2 border-2 border-[#0A192F] rounded-full font-bold text-sm transition-all shadow-[2px_2px_0px_#0A192F] active:translate-y-[2px] active:translate-x-[2px] active:shadow-none
-                        ${isSelected ? 'bg-[#C7B9FF] text-[#0A192F]' : 'bg-[#FDFBF7] hover:bg-[#EAEAEA]'}`}
+                                            key={opt.id}
+                                            onClick={() => setSelectedAudience(isSelected ? null : opt.id)}
+                                            className={`
+                                                relative p-3 border-2 border-[#0A192F] rounded-2xl text-left transition-all
+                                                shadow-[2px_2px_0px_#0A192F] active:translate-y-[2px] active:translate-x-[2px] active:shadow-none
+                                                ${isPersonal ? 'col-span-2' : ''}
+                                                ${isSelected
+                                                    ? 'text-[#0A192F] scale-[1.02]'
+                                                    : 'bg-[#FDFBF7] hover:bg-[#F0EEE9]'}
+                                            `}
+                                            style={isSelected ? { backgroundColor: opt.color } : {}}
                                         >
-                                            {isSelected && <span className="mr-1">★</span>}
-                                            {genre}
+                                            {isSelected && (
+                                                <div className="absolute top-2 right-2 w-4 h-4 bg-[#0A192F] rounded-full flex items-center justify-center">
+                                                    <div className="w-1.5 h-1.5 bg-white rounded-full" />
+                                                </div>
+                                            )}
+                                            <div className="text-xl mb-1">{opt.emoji}</div>
+                                            <div className="font-black text-sm leading-tight">{opt.label}</div>
+                                            <div className="font-medium text-[10px] text-[#0A192F]/60 mt-0.5 leading-tight">{opt.desc}</div>
                                         </button>
                                     );
                                 })}
@@ -206,15 +314,14 @@ const EpisenseInputCanvas = () => {
                     </div>
                 </div>
 
-                {/* Giant Action Footer */}
+                {/* ── Action Footer ── */}
                 <div className="mt-8">
                     <button
                         onClick={handleArchitect}
-                        disabled={!concept.trim()}
-                        className="w-full bg-[#0A192F] text-white border-4 border-[#0A192F] rounded-[2.5rem] p-6 md:p-8 flex items-center justify-between group disabled:opacity-50 disabled:cursor-not-allowed shadow-[8px_8px_0px_#33A1FF] hover:shadow-[10px_10px_0px_#33A1FF] hover:-translate-y-1 active:translate-y-[4px] active:translate-x-[4px] active:shadow-none transition-all overflow-hidden relative"
+                        disabled={!canArchitect}
+                        className="w-full bg-[#0A192F] text-white border-4 border-[#0A192F] rounded-[2.5rem] p-6 md:p-8 flex items-center justify-between group disabled:opacity-40 disabled:cursor-not-allowed shadow-[8px_8px_0px_#33A1FF] hover:shadow-[10px_10px_0px_#33A1FF] hover:-translate-y-1 active:translate-y-[4px] active:translate-x-[4px] active:shadow-none transition-all overflow-hidden relative"
                     >
-                        {/* Hover shine effect */}
-                        <div className="absolute top-0 -left-[100%] w-1/2 h-full bg-gradient-to-r from-transparent via-white/20 to-transparent skew-x-[-20deg] group-hover:animate-shine"></div>
+                        <div className="absolute top-0 -left-[100%] w-1/2 h-full bg-gradient-to-r from-transparent via-white/20 to-transparent skew-x-[-20deg] group-hover:animate-shine" />
 
                         <div className="flex items-center gap-6 relative z-10">
                             <div className="w-16 h-16 bg-[#33A1FF] border-2 border-[#0A192F] rounded-full flex items-center justify-center shadow-[4px_4px_0px_#0A192F] group-hover:scale-110 transition-transform">
@@ -222,7 +329,13 @@ const EpisenseInputCanvas = () => {
                             </div>
                             <div className="text-left">
                                 <h2 className="text-3xl md:text-4xl font-black uppercase tracking-tight">Architect the Series</h2>
-                                <span className="font-mono text-sm text-[#33A1FF] font-bold">Inject into NLP Pipeline &rarr;</span>
+                                <span className="font-mono text-sm text-[#33A1FF] font-bold">
+                                    {!concept.trim()
+                                        ? 'Enter your concept first'
+                                        : !selectedAudience
+                                            ? 'Select a target audience'
+                                            : `For ${selectedAudienceObj?.label} · ${episodes} Episodes → Pick a Direction`}
+                                </span>
                             </div>
                         </div>
 
@@ -237,79 +350,223 @@ const EpisenseInputCanvas = () => {
                 </div>
             </div>
 
-            {/* Engine Processing Overlay (Replaces standard spinner with a cool narrative breakdown visual)
-      */}
-            <div className={`fixed inset-0 z-50 bg-[#FDFBF7]/90 backdrop-blur-xl flex flex-col items-center justify-center transition-all duration-500 ${isProcessing ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}>
+            {/* ════════════════════════════════════════════════
+                  DIRECTIONS POPUP
+              ════════════════════════════════════════════════ */}
+            {showDirections && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#0A192F]/60 backdrop-blur-sm animate-fade-in">
+                    <div className="w-full max-w-2xl bg-[#FDFBF7] border-4 border-[#0A192F] rounded-[2.5rem] p-6 md:p-8 shadow-[12px_12px_0px_#0A192F] animate-modal-in">
 
-                <div className="max-w-xl w-full px-6">
-                    <div className="flex items-center gap-4 mb-8">
-                        <div className="w-12 h-12 bg-[#D4FF33] border-4 border-[#0A192F] rounded-full animate-spin flex items-center justify-center shadow-[4px_4px_0px_#0A192F]">
-                            <div className="w-4 h-4 bg-[#0A192F] rounded-full"></div>
+                        {/* Header */}
+                        <div className="flex items-start justify-between mb-6">
+                            <div>
+                                <div className="flex items-center gap-2 mb-2">
+                                    <div className="bg-[#C7B9FF] border-2 border-[#0A192F] p-2 rounded-xl shadow-[2px_2px_0px_#0A192F]">
+                                        <Compass className="w-4 h-4" />
+                                    </div>
+                                    <span className="font-mono text-xs font-black uppercase tracking-widest text-[#0A192F]/50">Step 2 of 2</span>
+                                </div>
+                                <h2 className="text-3xl font-black tracking-tight leading-tight">Choose your<br />Narrative Direction.</h2>
+                                <p className="text-sm font-medium text-[#0A192F]/50 mt-1">
+                                    Audience: <span className="font-black text-[#0A192F]">{selectedAudienceObj?.emoji} {selectedAudienceObj?.label}</span>
+                                    {' · '}{episodes} episodes
+                                </p>
+                            </div>
+                            <button
+                                onClick={() => setShowDirections(false)}
+                                className="w-10 h-10 bg-white border-2 border-[#0A192F] rounded-full flex items-center justify-center shadow-[2px_2px_0px_#0A192F] hover:bg-[#FF9E9E] transition-colors active:shadow-none active:translate-y-[2px]"
+                            >
+                                <X className="w-4 h-4" />
+                            </button>
                         </div>
-                        <h2 className="text-4xl font-black uppercase tracking-tight">VBOX Engine<br />Active.</h2>
+
+                        {/* Direction Cards */}
+                        <div className="space-y-3 mb-6">
+                            {DIRECTIONS.map((dir, idx) => {
+                                const isSelected = selectedDirection === dir.id;
+                                return (
+                                    <button
+                                        key={dir.id}
+                                        onClick={() => setSelectedDirection(isSelected ? null : dir.id)}
+                                        className={`
+                                            w-full text-left p-5 border-3 border-[#0A192F] rounded-2xl transition-all
+                                            shadow-[3px_3px_0px_#0A192F] active:shadow-none active:translate-y-[3px] active:translate-x-[3px]
+                                            ${isSelected ? 'border-[#0A192F] scale-[1.01]' : 'bg-white hover:scale-[1.005]'}
+                                        `}
+                                        style={isSelected ? { backgroundColor: dir.color, borderWidth: '3px' } : { borderWidth: '3px' }}
+                                    >
+                                        <div className="flex items-start gap-4">
+                                            <div className={`w-10 h-10 rounded-xl border-2 border-[#0A192F] flex items-center justify-center flex-shrink-0 mt-0.5 shadow-[2px_2px_0px_#0A192F] transition-colors ${isSelected ? 'bg-[#0A192F] text-white' : 'bg-[#FDFBF7]'}`}>
+                                                {dir.icon}
+                                            </div>
+                                            <div className="flex-1">
+                                                <div className="flex items-center gap-2 mb-1">
+                                                    <span className="font-black text-lg leading-tight">{dir.title}</span>
+                                                    <span className="font-mono text-xs bg-[#0A192F]/10 px-2 py-0.5 rounded-full font-bold">
+                                                        #{idx + 1}
+                                                    </span>
+                                                    {isSelected && <CheckCircle2 className="w-4 h-4 text-[#0A192F] ml-auto" />}
+                                                </div>
+                                                <p className="font-bold text-sm text-[#0A192F]/70 mb-2 italic">"{dir.tagline}"</p>
+                                                <p className="font-medium text-xs text-[#0A192F]/60 leading-relaxed">{dir.reason}</p>
+                                            </div>
+                                        </div>
+                                    </button>
+                                );
+                            })}
+                        </div>
+
+                        {/* Generate CTA */}
+                        <button
+                            onClick={handleGenerate}
+                            disabled={!selectedDirection}
+                            className="w-full bg-[#0A192F] text-white font-black text-lg py-5 rounded-2xl flex items-center justify-center gap-3 disabled:opacity-40 disabled:cursor-not-allowed shadow-[4px_4px_0px_#33A1FF] hover:shadow-[6px_6px_0px_#33A1FF] hover:-translate-y-0.5 active:translate-y-[4px] active:translate-x-[4px] active:shadow-none transition-all group"
+                        >
+                            <BrainCircuit className="w-5 h-5" />
+                            {selectedDirection
+                                ? `Generate with "${selectedDirectionObj?.title}"`
+                                : 'Select a Direction Above'}
+                            <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {/* ════════════════════════════════════════════════
+                  PROCESSING OVERLAY
+              ════════════════════════════════════════════════ */}
+            <div className={`fixed inset-0 z-50 bg-[#FDFBF7]/95 backdrop-blur-xl flex flex-col items-center justify-center transition-all duration-500 ${isProcessing ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}>
+                <div className="max-w-xl w-full px-6">
+
+                    {/* Engine Header */}
+                    <div className="flex items-center gap-4 mb-8">
+                        <div className="w-14 h-14 bg-[#D4FF33] border-4 border-[#0A192F] rounded-full flex items-center justify-center shadow-[4px_4px_0px_#0A192F] relative">
+                            <div className="absolute inset-0 rounded-full border-4 border-t-[#33A1FF] border-r-transparent border-b-transparent border-l-transparent animate-spin" />
+                            <div className="w-4 h-4 bg-[#0A192F] rounded-full" />
+                        </div>
+                        <div>
+                            <h2 className="text-4xl font-black uppercase tracking-tight leading-none">VBOX Engine</h2>
+                            <span className="font-mono text-sm font-bold text-[#33A1FF] uppercase tracking-widest">Active · Processing</span>
+                        </div>
                     </div>
 
+                    {/* Progress Bar */}
+                    <div className="mb-6">
+                        <div className="flex justify-between items-center mb-2">
+                            <span className="font-mono text-xs font-black uppercase tracking-widest text-[#0A192F]/50">Pipeline Progress</span>
+                            <span className="font-mono text-sm font-black text-[#0A192F]">{progressPct}%</span>
+                        </div>
+                        <div className="h-3 bg-[#EAEAEA] border-2 border-[#0A192F] rounded-full overflow-hidden shadow-inner">
+                            <div
+                                className="h-full bg-[#0A192F] rounded-full transition-all duration-100 ease-linear relative overflow-hidden"
+                                style={{ width: `${progressPct}%` }}
+                            >
+                                {/* Shimmer on the bar */}
+                                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent animate-shimmer" />
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Steps */}
                     <div className="bg-white border-4 border-[#0A192F] rounded-3xl p-6 shadow-[8px_8px_0px_#0A192F]">
+                        <div className="space-y-3">
+                            {PROCESS_STEPS.map((step, idx) => {
+                                const active = processStep > idx;
+                                const current = processStep === idx;
+                                return (
+                                    <div
+                                        key={idx}
+                                        className={`flex items-center gap-4 p-3 rounded-xl border-2 transition-all duration-500 ${active
+                                                ? 'border-[#0A192F]'
+                                                : current
+                                                    ? 'border-[#0A192F]/30 animate-pulse'
+                                                    : 'border-transparent opacity-25'
+                                            }`}
+                                        style={active ? { backgroundColor: step.color + '25' } : {}}
+                                    >
+                                        {/* Step indicator */}
+                                        <div
+                                            className={`w-7 h-7 rounded-full border-2 border-[#0A192F] flex items-center justify-center flex-shrink-0 transition-all duration-500 ${active ? 'scale-110' : ''}`}
+                                            style={active ? { backgroundColor: step.color } : { backgroundColor: 'transparent' }}
+                                        >
+                                            {active
+                                                ? <div className="w-2 h-2 bg-[#0A192F] rounded-full" />
+                                                : <span className="font-black text-xs text-[#0A192F]/40">{idx + 1}</span>
+                                            }
+                                        </div>
+                                        <span className={`font-bold text-base transition-all duration-300 ${active ? 'text-[#0A192F]' : 'text-[#0A192F]/40'}`}>
+                                            {step.label}
+                                        </span>
+                                        {active && (
+                                            <CheckCircle2 className="w-4 h-4 ml-auto flex-shrink-0 text-[#0A192F]" />
+                                        )}
+                                    </div>
+                                );
+                            })}
 
-                        <div className="space-y-4">
-                            {/* Step 1 */}
-                            <div className={`flex items-center gap-4 p-3 rounded-xl border-2 transition-all ${processStep >= 1 ? 'border-[#0A192F] bg-[#33A1FF]/10' : 'border-transparent opacity-30'}`}>
-                                <div className={`w-6 h-6 rounded-full border-2 border-[#0A192F] flex items-center justify-center ${processStep >= 1 ? 'bg-[#33A1FF]' : 'bg-transparent'}`}>
-                                    {processStep >= 1 && <div className="w-2 h-2 bg-[#0A192F] rounded-full"></div>}
-                                </div>
-                                <span className="font-bold text-lg">Decomposing entities & timeline...</span>
-                            </div>
-
-                            {/* Step 2 */}
-                            <div className={`flex items-center gap-4 p-3 rounded-xl border-2 transition-all ${processStep >= 2 ? 'border-[#0A192F] bg-[#FF9E9E]/10' : 'border-transparent opacity-30'}`}>
-                                <div className={`w-6 h-6 rounded-full border-2 border-[#0A192F] flex items-center justify-center ${processStep >= 2 ? 'bg-[#FF9E9E]' : 'bg-transparent'}`}>
-                                    {processStep >= 2 && <div className="w-2 h-2 bg-[#0A192F] rounded-full"></div>}
-                                </div>
-                                <span className="font-bold text-lg">Mapping emotional trajectory...</span>
-                            </div>
-
-                            {/* Step 3 (Visualizing the 5-8 blocks) */}
-                            <div className={`flex items-center gap-4 p-3 rounded-xl border-2 transition-all ${processStep >= 3 ? 'border-[#0A192F] bg-[#D4FF33]/10' : 'border-transparent opacity-30'}`}>
-                                <div className={`w-6 h-6 rounded-full border-2 border-[#0A192F] flex items-center justify-center ${processStep >= 3 ? 'bg-[#D4FF33]' : 'bg-transparent'}`}>
-                                    {processStep >= 3 && <div className="w-2 h-2 bg-[#0A192F] rounded-full"></div>}
-                                </div>
-                                <div className="flex-1">
-                                    <span className="font-bold text-lg block mb-2">Slicing into {episodes} vertical arcs...</span>
+                            {/* Episode Visualizer — appears on last step */}
+                            <div className={`transition-all duration-700 overflow-hidden ${processStep >= 4 ? 'max-h-24 opacity-100' : 'max-h-0 opacity-0'}`}>
+                                <div className="pt-2 px-3">
                                     <div className="flex gap-2">
                                         {[...Array(episodes)].map((_, i) => (
                                             <div
                                                 key={i}
-                                                className="h-8 flex-1 bg-[#0A192F] border-2 border-[#0A192F] rounded-md animate-pop-in"
-                                                style={{ animationDelay: `${(i * 0.1) + 2.5}s`, opacity: processStep >= 3 ? 1 : 0 }}
-                                            ></div>
+                                                className="h-10 flex-1 bg-[#0A192F] border-2 border-[#0A192F] rounded-md animate-pop-in"
+                                                style={{ animationDelay: `${i * 0.08}s` }}
+                                            />
                                         ))}
                                     </div>
+                                    <p className="font-mono text-xs font-bold text-[#0A192F]/50 uppercase tracking-widest mt-2 text-center">
+                                        {episodes} arcs locked in
+                                    </p>
                                 </div>
                             </div>
                         </div>
-
                     </div>
+
+                    {/* Direction tag */}
+                    {selectedDirectionObj && (
+                        <div className="mt-4 flex items-center justify-center gap-2">
+                            <div className="inline-flex items-center gap-2 bg-white border-2 border-[#0A192F] rounded-full px-4 py-2 shadow-[2px_2px_0px_#0A192F]">
+                                <span className="font-mono text-xs font-black uppercase tracking-widest text-[#0A192F]/50">Direction:</span>
+                                <span className="font-black text-sm text-[#0A192F]">{selectedDirectionObj.title}</span>
+                                <div className="w-3 h-3 rounded-full border border-[#0A192F]" style={{ backgroundColor: selectedDirectionObj.color }} />
+                            </div>
+                        </div>
+                    )}
                 </div>
             </div>
 
-            {/* Embedded Styles for custom brutalist/pop animations */}
+            {/* ── Styles ── */}
             <style dangerouslySetInnerHTML={{
                 __html: `
-        @keyframes shine {
-          100% { left: 200%; }
-        }
-        @keyframes popIn {
-          0% { transform: scale(0); opacity: 0; }
-          70% { transform: scale(1.1); opacity: 1; }
-          100% { transform: scale(1); opacity: 1; }
-        }
-        .animate-shine {
-          animation: shine 1.5s ease-in-out infinite;
-        }
-        .animate-pop-in {
-          animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
-        }
-      `}} />
+          @keyframes shine {
+            100% { left: 200%; }
+          }
+          @keyframes shimmer {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(400%); }
+          }
+          @keyframes popIn {
+            0% { transform: scaleY(0); opacity: 0; transform-origin: bottom; }
+            70% { transform: scaleY(1.1); opacity: 1; }
+            100% { transform: scaleY(1); opacity: 1; }
+          }
+          @keyframes modalIn {
+            0% { opacity: 0; transform: scale(0.9) translateY(24px); }
+            100% { opacity: 1; transform: scale(1) translateY(0); }
+          }
+          @keyframes fadeIn {
+            0% { opacity: 0; }
+            100% { opacity: 1; }
+          }
+          .animate-shine { animation: shine 1.5s ease-in-out infinite; }
+          .animate-shimmer { animation: shimmer 1.4s ease-in-out infinite; }
+          .animate-pop-in { animation: popIn 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; opacity: 0; }
+          .animate-modal-in { animation: modalIn 0.4s cubic-bezier(0.34, 1.2, 0.64, 1) forwards; }
+          .animate-fade-in { animation: fadeIn 0.25s ease-out forwards; }
+          .border-3 { border-width: 3px; }
+        `}} />
         </div>
     );
 };
