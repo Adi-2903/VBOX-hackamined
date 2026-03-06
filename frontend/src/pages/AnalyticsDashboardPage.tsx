@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect, useMemo } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import {
     Activity,
     Flame,
@@ -9,34 +9,66 @@ import {
     Eye,
     Wand2
 } from 'lucide-react';
+import type { SeriesAnalysis } from '../services/api';
 
 const EpisenseAnalytics = () => {
     const navigate = useNavigate();
+    const location = useLocation();
     const [isLoaded, setIsLoaded] = useState(false);
     const [activeEpisodeHover, setActiveEpisodeHover] = useState<number | null>(null);
 
     useEffect(() => {
-        // Trigger entry animations
         setIsLoaded(true);
     }, []);
 
-    // Mock Data for the 5-Episode Arc
-    const seriesData = {
-        globalScore: 88,
-        projectedCompletion: "74%",
-        flatZones: 2,
-        episodes: [
-            { id: 1, title: "The Descent", sentiment: 80, hook: 94, riskLevel: "Low", dropTime: null },
-            { id: 2, title: "The Dry Room", sentiment: 30, hook: 72, riskLevel: "High", dropTime: "0:42" },
-            { id: 3, title: "The Ringing", sentiment: 90, hook: 98, riskLevel: "Low", dropTime: null },
-            { id: 4, title: "The Paradox", sentiment: 20, hook: 65, riskLevel: "Critical", dropTime: "0:60" },
-            { id: 5, title: "The Loop", sentiment: 100, hook: 95, riskLevel: "Low", dropTime: null }
-        ]
-    };
+    const routerAnalysis = (location.state as { analysis?: SeriesAnalysis } | null)?.analysis;
+
+    // Map API data to component format, fallback to mock
+    const seriesData = useMemo(() => {
+        if (!routerAnalysis) {
+            return {
+                globalScore: 88,
+                projectedCompletion: "74%",
+                flatZones: 2,
+                episodes: [
+                    { id: 1, title: "The Descent", sentiment: 80, hook: 94, riskLevel: "Low", dropTime: null },
+                    { id: 2, title: "The Dry Room", sentiment: 30, hook: 72, riskLevel: "High", dropTime: "0:42" },
+                    { id: 3, title: "The Ringing", sentiment: 90, hook: 98, riskLevel: "Low", dropTime: null },
+                    { id: 4, title: "The Paradox", sentiment: 20, hook: 65, riskLevel: "Critical", dropTime: "0:60" },
+                    { id: 5, title: "The Loop", sentiment: 100, hook: 95, riskLevel: "Low", dropTime: null },
+                ],
+            };
+        }
+
+        const eps = routerAnalysis.episodes.map(meta => {
+            const a = meta.analysis;
+            const riskSeg = a?.features?.dropoff_prediction?.segments?.find(s => s.dropoff_risk > 0.4);
+            return {
+                id: meta.episode_number,
+                title: meta.title,
+                sentiment: Math.round((a?.features?.emotional_arc?.emotion_peak ?? 0.5) * 100),
+                hook: Math.round((a?.cliffhanger?.cliffhanger_score ?? 5) * 10),
+                riskLevel: a?.retention?.risk_level === "HIGH" ? "Critical" : a?.retention?.risk_level === "MEDIUM" ? "High" : "Low",
+                dropTime: riskSeg ? riskSeg.label.split("(")[1]?.split("-")[0] || null : null,
+            };
+        });
+        const flatZones = routerAnalysis.episodes.filter(meta => meta.analysis?.features?.emotional_arc?.arc_shape === "FLAT").length;
+        return {
+            globalScore: Math.round(routerAnalysis.series_insights.avg_overall_score),
+            projectedCompletion: Math.round(routerAnalysis.series_insights.consistency_score * 100) + "%",
+            flatZones,
+            episodes: eps,
+        };
+    }, [routerAnalysis]);
 
     // Calculate SVG Path for Emotional Arc (Rollercoaster effect)
     const generatePath = () => {
-        // Smooth bezier curve approximation
+        if (seriesData.episodes.length < 5) {
+            // Simple linear path for fewer episodes
+            return seriesData.episodes
+                .map((ep, i) => `${i === 0 ? 'M' : 'L'} ${(i / Math.max(seriesData.episodes.length - 1, 1)) * 100},${100 - ep.sentiment}`)
+                .join(' ');
+        }
         return `M 0,${100 - seriesData.episodes[0].sentiment} 
             C 20,${100 - seriesData.episodes[0].sentiment} 
               15,${100 - seriesData.episodes[1].sentiment} 
@@ -268,7 +300,7 @@ const EpisenseAnalytics = () => {
                                 </p>
 
                                 <button
-                                    onClick={() => navigate('/suggestions')}
+                                    onClick={() => navigate('/suggestions', { state: { analysis: routerAnalysis } })}
                                     className="w-full bg-[#D4FF33] border-2 border-white text-[#0A192F] font-black uppercase text-sm py-3 rounded-xl flex items-center justify-center gap-2 hover:bg-white transition-colors">
                                     <Wand2 className="w-4 h-4" /> Open Suggestion Engine
                                 </button>

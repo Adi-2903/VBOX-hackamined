@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useMemo } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import {
     ArrowLeft,
     Activity,
@@ -11,70 +11,68 @@ import {
     PlaySquare,
     Zap
 } from 'lucide-react';
+import type { GeneratedSeries, SeriesAnalysis } from '../services/api';
 
-// Narrative Arc Data (Continuing the Deep Sea Prompt)
-const episodeData = [
+// Fallback mock data when no API data is available
+const fallbackEpisodeData = [
     {
-        id: 1,
-        title: "The Dry Room",
-        duration: "90s",
-        health: "optimal",
-        summary: "Diver descends into the Mariana Trench. Communications fail. Suddenly, sonar detects a geometric cube. He breaches it to find a completely dry, oxygen-rich 1800s study. In the center sits a modern smartphone.",
+        id: 1, title: "The Dry Room", duration: "90s", health: "optimal",
+        summary: "Diver descends into the Mariana Trench. Communications fail. Suddenly, sonar detects a geometric cube.",
         cliffhanger: { score: 94, text: "The unplugged smartphone begins to ring." },
-        retentionTimeline: [80, 85, 90, 88, 85, 82, 90, 95, 100], // 10-sec blocks
-        riskZone: null,
-        suggestion: null
+        retentionTimeline: [80, 85, 90, 88, 85, 82, 90, 95, 100],
+        riskZone: null, suggestion: null,
     },
     {
-        id: 2,
-        title: "The Caller ID",
-        duration: "85s",
-        health: "risk",
-        summary: "The diver hesitates, staring at the ringing phone. He checks his own depth gauge—it makes no sense. He walks slowly toward the desk. He picks up the phone and looks at the caller ID.",
+        id: 2, title: "The Caller ID", duration: "85s", health: "risk",
+        summary: "The diver hesitates, staring at the ringing phone. He picks it up and looks at the caller ID.",
         cliffhanger: { score: 72, text: "It's his daughter, supposed to be asleep on the surface." },
         retentionTimeline: [90, 85, 70, 60, 55, 65, 70, 80, 85],
-        riskZone: { start: "0:30", end: "0:50", reason: "Excessive hesitation/internal monologue. Pacing stalls." },
-        suggestion: "Cut the depth-gauge check. Accelerate the walk to the desk by 15 seconds to bridge the curiosity gap faster."
+        riskZone: { start: "0:30", end: "0:50", reason: "Pacing stalls." },
+        suggestion: "Accelerate the walk to the desk by 15 seconds.",
     },
-    {
-        id: 3,
-        title: "The Voice",
-        duration: "90s",
-        health: "optimal",
-        summary: "He answers. It's his daughter, but she sounds older. She frantically warns him not to turn around. He asks what she means. She says 'The crack is already behind you.'",
-        cliffhanger: { score: 98, text: "The sound of glass splintering directly behind his helmet." },
-        retentionTimeline: [85, 88, 92, 95, 94, 96, 98, 99, 100],
-        riskZone: null,
-        suggestion: null
-    },
-    {
-        id: 4,
-        title: "The Breach",
-        duration: "88s",
-        health: "risk",
-        summary: "He turns. A hairline fracture in the seemingly impenetrable glass wall is leaking water. He tries to find a way to plug it, searching the 1800s desk for tools, panicking.",
-        cliffhanger: { score: 65, text: "The water reaches his ankles." },
-        retentionTimeline: [100, 95, 90, 80, 75, 75, 70, 68, 65],
-        riskZone: { start: "0:50", end: "0:90", reason: "Action feels repetitive. The stakes plateau instead of escalating." },
-        suggestion: "Heuristics flag weak hook. Introduce a secondary threat—the lights shorting out as the water rises. Change cliffhanger to pitch blackness."
-    },
-    {
-        id: 5,
-        title: "The Loop",
-        duration: "90s",
-        health: "optimal",
-        summary: "Pitch black. Water at his chest. He realizes the phone is still connected. He speaks to his daughter one last time, realizing she wasn't warning him—she was giving him the exact time of his death.",
-        cliffhanger: { score: 95, text: "Final dial tone as the room implodes. Series End." },
-        retentionTimeline: [70, 75, 85, 90, 95, 98, 99, 100, 100],
-        riskZone: null,
-        suggestion: null
-    }
 ];
 
 const EpisenseDashboard = () => {
     const navigate = useNavigate();
+    const location = useLocation();
+
+    // Read data from Router state (passed from StoryInputPage)
+    const routerState = location.state as {
+        series?: GeneratedSeries;
+        analysis?: SeriesAnalysis;
+    } | null;
+
+    // Map API data to component's episode format
+    const episodeData = useMemo(() => {
+        if (!routerState?.series || !routerState?.analysis) return fallbackEpisodeData;
+
+        return routerState.series.episodes.map((ep, idx) => {
+            const meta = routerState.analysis!.episodes[idx];
+            const a = meta?.analysis;
+            const highRiskSeg = a?.features?.dropoff_prediction?.segments?.find(s => s.dropoff_risk > 0.4);
+            return {
+                id: ep.episode_number,
+                title: ep.title,
+                duration: "90s",
+                health: a?.retention?.risk_level === "HIGH" ? "risk" : "optimal",
+                summary: ep.story.slice(0, 250) + (ep.story.length > 250 ? "..." : ""),
+                cliffhanger: {
+                    score: a ? Math.round(a.cliffhanger.cliffhanger_score * 10) : 80,
+                    text: ep.cliffhanger,
+                },
+                retentionTimeline: a?.features?.dropoff_prediction?.segments
+                    ? a.features.dropoff_prediction.segments.map(s => Math.round(s.engagement_score * 100))
+                    : [80, 85, 90, 88, 85, 82, 90, 95, 100],
+                riskZone: highRiskSeg
+                    ? { start: highRiskSeg.label.split("(")[1]?.split("-")[0] || "0:00", end: highRiskSeg.label.split("-")[1]?.replace(")", "") || "0:90", reason: `Drop-off risk ${Math.round(highRiskSeg.dropoff_risk * 100)}% in ${highRiskSeg.label} segment.` }
+                    : null,
+                suggestion: a?.retention?.recommendations?.[0]?.suggestion || null,
+            };
+        });
+    }, [routerState]);
+
     const [activeEp, setActiveEp] = useState(episodeData[0]);
-    const [fixedEpisodes, setFixedEpisodes] = useState(new Set()); // Track applied suggestions
+    const [fixedEpisodes, setFixedEpisodes] = useState(new Set());
     const [isExporting, setIsExporting] = useState(false);
 
     const isFixed = fixedEpisodes.has(activeEp.id);
@@ -288,7 +286,7 @@ const EpisenseDashboard = () => {
                                     <button
                                         onClick={() => {
                                             handleApplyFix();
-                                            navigate('/suggestions');
+                                            navigate('/suggestions', { state: { analysis: routerState?.analysis } });
                                         }}
                                         className="w-full bg-[#D4FF33] border-4 border-[#0A192F] text-[#0A192F] px-4 py-4 rounded-2xl font-black uppercase tracking-wide shadow-[4px_4px_0px_#0A192F] hover:-translate-y-1 active:translate-y-[2px] active:shadow-none transition-all flex items-center justify-center gap-2"
                                     >

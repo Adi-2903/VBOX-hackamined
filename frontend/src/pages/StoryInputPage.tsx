@@ -10,7 +10,6 @@ import {
     BrainCircuit,
     Timer,
     Users,
-    User,
     ArrowRight,
     CheckCircle2,
     X,
@@ -19,6 +18,7 @@ import {
     Eye,
     Layers
 } from 'lucide-react';
+import { generateSeries, analyzeSeries } from '../services/api';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -126,8 +126,8 @@ const EpisenseInputCanvas = () => {
         setSelectedDirection(null);
     };
 
-    // Step 2: user picks a direction → start processing
-    const handleGenerate = () => {
+    // Step 2: user picks a direction → start processing + API calls
+    const handleGenerate = async () => {
         if (!selectedDirection) return;
         setShowDirections(false);
         setIsProcessing(true);
@@ -138,24 +138,53 @@ const EpisenseInputCanvas = () => {
         let pct = 0;
         const ticker = setInterval(() => {
             pct += 1;
-            setProgressPct(pct);
-            if (pct >= 100) clearInterval(ticker);
-        }, 30);
+            setProgressPct(Math.min(pct, 95)); // Cap at 95% until API returns
+            if (pct >= 95) clearInterval(ticker);
+        }, 35);
 
         // Step reveals
         setTimeout(() => setProcessStep(1), 700);
         setTimeout(() => setProcessStep(2), 1500);
         setTimeout(() => setProcessStep(3), 2400);
-        setTimeout(() => setProcessStep(4), 3000);
 
-        // Navigate when done
-        setTimeout(() => {
-            setIsProcessing(false);
-            setProcessStep(0);
-            setProgressPct(0);
-            setConcept('');
-            navigate('/breakdown');
-        }, 3800);
+        try {
+            // Call backend: generate episodes
+            const directionName = selectedDirectionObj?.title || selectedDirection;
+            const audienceName = selectedAudienceObj?.label || 'Gen Z';
+            const series = await generateSeries(concept, episodes, [], audienceName, directionName);
+
+            setTimeout(() => setProcessStep(4), 100);
+
+            // Call backend: analyze the generated episodes
+            const analysis = await analyzeSeries(series.episodes, series.category);
+
+            // Complete progress
+            clearInterval(ticker);
+            setProgressPct(100);
+
+            // Brief delay to show 100%, then navigate with data
+            setTimeout(() => {
+                setIsProcessing(false);
+                setProcessStep(0);
+                setProgressPct(0);
+                navigate('/breakdown', {
+                    state: { series, analysis, concept, audience: audienceName },
+                });
+            }, 400);
+        } catch (err) {
+            console.error('Engine error:', err);
+            clearInterval(ticker);
+            setProgressPct(100);
+            setTimeout(() => setProcessStep(4), 100);
+
+            // Fallback: navigate without data so app doesn't break
+            setTimeout(() => {
+                setIsProcessing(false);
+                setProcessStep(0);
+                setProgressPct(0);
+                navigate('/breakdown');
+            }, 800);
+        }
     };
 
     const canArchitect = concept.trim().length > 0 && selectedAudience !== null;
@@ -477,10 +506,10 @@ const EpisenseInputCanvas = () => {
                                     <div
                                         key={idx}
                                         className={`flex items-center gap-4 p-3 rounded-xl border-2 transition-all duration-500 ${active
-                                                ? 'border-[#0A192F]'
-                                                : current
-                                                    ? 'border-[#0A192F]/30 animate-pulse'
-                                                    : 'border-transparent opacity-25'
+                                            ? 'border-[#0A192F]'
+                                            : current
+                                                ? 'border-[#0A192F]/30 animate-pulse'
+                                                : 'border-transparent opacity-25'
                                             }`}
                                         style={active ? { backgroundColor: step.color + '25' } : {}}
                                     >

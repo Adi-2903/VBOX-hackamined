@@ -12,10 +12,11 @@ import {
     Sparkles,
     User
 } from 'lucide-react';
+import { listProjects, type ProjectResponse } from '../services/api';
 
 // Mock Data with varying content to demonstrate Masonry layout
 interface Project {
-    id: number;
+    id: number | string;
     title: string;
     excerpt: string;
     episodes: number;
@@ -25,68 +26,48 @@ interface Project {
     pattern: string;
 }
 
-const projects: Project[] = [
-    {
-        id: 1,
-        title: "The Deep Sea Paradox",
-        excerpt: "A diver finds an oxygen-rich 1800s study at the bottom of the Mariana Trench.",
-        episodes: 5,
-        hookScore: 94,
-        lastEdited: "2 hours ago",
-        thumbnailColor: "bg-[#33A1FF]",
-        pattern: "circle"
-    },
-    {
-        id: 2,
-        title: "Neon Shadows: Tokyo",
-        excerpt: "Cyberpunk detective thriller involving memory-altering neon signs.",
-        episodes: 8,
-        hookScore: 88,
-        lastEdited: "Yesterday",
-        thumbnailColor: "bg-[#FF9E9E]",
-        pattern: "stripes"
-    },
-    {
-        id: 3,
-        title: "The Silent Orbit",
-        excerpt: "Astronaut wakes up alone, but the ship's AI insists there is a full crew on board.",
-        episodes: 6,
-        hookScore: 72,
-        lastEdited: "3 days ago",
-        thumbnailColor: "bg-[#D4FF33]",
-        pattern: "dots"
-    },
-    {
-        id: 4,
-        title: "Project_Mirage",
-        excerpt: "A group of teens discover their town only exists when they are looking at it.",
-        episodes: 5,
-        hookScore: 98,
-        lastEdited: "Last week",
-        thumbnailColor: "bg-[#C7B9FF]",
-        pattern: "grid"
-    },
-    {
-        id: 5,
-        title: "Echos of the Valley",
-        excerpt: "Fantasy lore breakdown.",
-        episodes: 7,
-        hookScore: 81,
-        lastEdited: "2 weeks ago",
-        thumbnailColor: "bg-[#FFB033]", // Orange
-        pattern: "circle"
-    }
+const COLORS = ["bg-[#33A1FF]", "bg-[#FF9E9E]", "bg-[#D4FF33]", "bg-[#C7B9FF]", "bg-[#FFB033]"];
+const PATTERNS = ["circle", "stripes", "dots", "grid"];
+
+const fallbackProjects: Project[] = [
+    { id: 1, title: "The Deep Sea Paradox", excerpt: "A diver finds an oxygen-rich 1800s study at the bottom of the Mariana Trench.", episodes: 5, hookScore: 94, lastEdited: "2 hours ago", thumbnailColor: "bg-[#33A1FF]", pattern: "circle" },
+    { id: 2, title: "Neon Shadows: Tokyo", excerpt: "Cyberpunk detective thriller involving memory-altering neon signs.", episodes: 8, hookScore: 88, lastEdited: "Yesterday", thumbnailColor: "bg-[#FF9E9E]", pattern: "stripes" },
+    { id: 3, title: "The Silent Orbit", excerpt: "Astronaut wakes up alone, but the ship's AI insists there is a full crew on board.", episodes: 6, hookScore: 72, lastEdited: "3 days ago", thumbnailColor: "bg-[#D4FF33]", pattern: "dots" },
 ];
+
+function mapApiToProject(p: ProjectResponse, idx: number): Project {
+    return {
+        id: p.id,
+        title: p.title,
+        excerpt: p.concept.slice(0, 120) + (p.concept.length > 120 ? "..." : ""),
+        episodes: p.episode_count || 0,
+        hookScore: p.overall_score || 0,
+        lastEdited: p.created_at ? new Date(p.created_at).toLocaleDateString() : "Unknown",
+        thumbnailColor: COLORS[idx % COLORS.length],
+        pattern: PATTERNS[idx % PATTERNS.length],
+    };
+}
 
 const EpisenseDashboard = () => {
     const navigate = useNavigate();
     const [isLoaded, setIsLoaded] = useState(false);
     const [selectedProject, setSelectedProject] = useState<Project | null>(null);
-    const [exportFormat, setExportFormat] = useState('json'); // 'json' | 'pdf' | 'link'
+    const [exportFormat, setExportFormat] = useState('json');
     const [isExporting, setIsExporting] = useState(false);
+    const [projects, setProjects] = useState<Project[]>(fallbackProjects);
 
     useEffect(() => {
-        setIsLoaded(true);
+        // Fetch projects from backend, fallback to mock data
+        listProjects()
+            .then(apiProjects => {
+                if (apiProjects.length > 0) {
+                    setProjects(apiProjects.map(mapApiToProject));
+                }
+            })
+            .catch(() => {
+                // Backend unavailable — keep fallback data
+            })
+            .finally(() => setIsLoaded(true));
     }, []);
 
     const openModal = (project: Project) => {

@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect, useMemo } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import {
     ArrowLeft,
     RefreshCw,
@@ -11,6 +11,7 @@ import {
     SplitSquareHorizontal,
     Wand2
 } from 'lucide-react';
+import type { SeriesAnalysis } from '../services/api';
 
 interface Suggestion {
     id: number;
@@ -28,54 +29,82 @@ interface Suggestion {
     applied: boolean;
 }
 
-const initialSuggestions: Suggestion[] = [
+const fallbackSuggestions: Suggestion[] = [
     {
-        id: 1,
-        type: "Retention Risk",
-        icon: AlertTriangle,
+        id: 1, type: "Retention Risk", icon: AlertTriangle,
         title: "Pacing Stall @ 0:50 - 0:75",
-        problem: "ML predicts a massive 35% audience drop-off. The action stalls as the diver searches the desk. The stakes plateau.",
-        fix: "Cut 15 seconds of internal monologue. Introduce the secondary threat (lights shorting out) immediately after the crack appears.",
-        impact: "+35% Retention",
-        color: "bg-[#FF9E9E]", // Pink
-        diff: {
-            before: "The diver stares at the crack. He walks over to the 1800s desk, opening drawers one by one, looking for tape or a sealant. He mutters to himself about the pressure.",
-            after: "The crack splinters. Suddenly, the desk lamp violently explodes. Plunged into darkness, the rising water is now the only sound."
-        },
-        applied: false
+        problem: "ML predicts a massive 35% audience drop-off. The action stalls as the diver searches the desk.",
+        fix: "Cut 15 seconds of internal monologue. Introduce the secondary threat immediately.",
+        impact: "+35% Retention", color: "bg-[#FF9E9E]",
+        diff: { before: "The diver stares at the crack. He walks over to the desk, opening drawers one by one.", after: "The crack splinters. Suddenly, the desk lamp violently explodes. Plunged into darkness." },
+        applied: false,
     },
     {
-        id: 2,
-        type: "Weak Cliffhanger",
-        icon: Flame,
+        id: 2, type: "Weak Cliffhanger", icon: Flame,
         title: "Insufficient Psychological Friction",
-        problem: "Hook score is only 72/100. Ending on the diver 'looking at the phone' doesn't create a strong enough curiosity gap to force a swipe.",
-        fix: "End abruptly on the visual reveal of the Caller ID. Cut the final line of dialogue.",
-        impact: "+22 Hook Score",
-        color: "bg-[#D4FF33]", // Lime
-        diff: {
-            before: "He picks up the phone. He looks at the screen. 'Hello? Who is this?' he asks. The screen shows his daughter's name.",
-            after: "He picks up the receiver. The screen illuminates the pitch black room: CALLER ID - SARAH (DAUGHTER). Cut to black."
-        },
-        applied: false
+        problem: "Hook score is only 72/100. Ending doesn't create a strong enough curiosity gap.",
+        fix: "End abruptly on the visual reveal of the Caller ID. Cut dialogue.",
+        impact: "+22 Hook Score", color: "bg-[#D4FF33]",
+        diff: { before: "He picks up the phone. 'Hello? Who is this?'", after: "The screen illuminates the room: CALLER ID - SARAH (DAUGHTER). Cut to black." },
+        applied: false,
     },
     {
-        id: 3,
-        type: "Flat Zone",
-        icon: Clock,
+        id: 3, type: "Flat Zone", icon: Clock,
         title: "Emotional Plateau @ 0:15 - 0:27",
-        problem: "Sentiment analysis detects 12 seconds of emotional flatness during the initial descent sequence.",
-        fix: "Overlay a high-tension sound design spike (sonar ping) at 0:18 to break the monotonous pacing.",
-        impact: "+15% Engagement",
-        color: "bg-[#33A1FF]", // Blue
-        diff: null, // Audio fix, no text diff
-        applied: false
-    }
+        problem: "Sentiment analysis detects 12 seconds of emotional flatness during the initial sequence.",
+        fix: "Overlay a high-tension sound design spike at 0:18.",
+        impact: "+15% Engagement", color: "bg-[#33A1FF]",
+        diff: null,
+        applied: false,
+    },
 ];
+
+const ICON_MAP: Record<string, React.ElementType> = {
+    "Retention Risk": AlertTriangle,
+    "Weak Cliffhanger": Flame,
+    "Flat Zone": Clock,
+    "Pacing": SplitSquareHorizontal,
+};
+const COLOR_MAP = ["bg-[#FF9E9E]", "bg-[#D4FF33]", "bg-[#33A1FF]", "bg-[#C7B9FF]"];
 
 const EpisenseRefine = () => {
     const navigate = useNavigate();
-    const [suggestions, setSuggestions] = useState(initialSuggestions);
+    const location = useLocation();
+
+    const routerAnalysis = (location.state as { analysis?: SeriesAnalysis } | null)?.analysis;
+
+    // Build suggestions from API analysis data
+    const derivedSuggestions = useMemo<Suggestion[]>(() => {
+        if (!routerAnalysis) return fallbackSuggestions;
+
+        const suggestions: Suggestion[] = [];
+        let id = 1;
+        for (const meta of routerAnalysis.episodes) {
+            const a = meta.analysis;
+            if (!a?.retention?.recommendations) continue;
+            for (const rec of a.retention.recommendations) {
+                const type = rec.area.toLowerCase().includes("hook") ? "Weak Cliffhanger"
+                    : rec.area.toLowerCase().includes("drop") || rec.area.toLowerCase().includes("retention") ? "Retention Risk"
+                        : rec.area.toLowerCase().includes("pacing") || rec.area.toLowerCase().includes("flat") ? "Flat Zone"
+                            : "Pacing";
+                suggestions.push({
+                    id: id++,
+                    type,
+                    icon: ICON_MAP[type] || AlertTriangle,
+                    title: `Ep ${meta.episode_number}: ${meta.title}`,
+                    problem: a.retention.reason || "Analysis flagged this episode.",
+                    fix: rec.suggestion,
+                    impact: `${rec.priority} — Risk: ${a.retention.risk_level}`,
+                    color: COLOR_MAP[(id - 1) % COLOR_MAP.length],
+                    diff: null,
+                    applied: false,
+                });
+            }
+        }
+        return suggestions.length > 0 ? suggestions : fallbackSuggestions;
+    }, [routerAnalysis]);
+
+    const [suggestions, setSuggestions] = useState<Suggestion[]>(derivedSuggestions);
     const [isLoaded, setIsLoaded] = useState(false);
     const [processingId, setProcessingId] = useState<number | null>(null);
     const [expandedDiffId, setExpandedDiffId] = useState<number | null>(null);
@@ -105,7 +134,7 @@ const EpisenseRefine = () => {
     const handleRegenerate = () => {
         setIsLoaded(false);
         setTimeout(() => {
-            setSuggestions(initialSuggestions); // Reset mock state
+            setSuggestions(derivedSuggestions); // Reset state
             setIsLoaded(true);
         }, 500);
     };
